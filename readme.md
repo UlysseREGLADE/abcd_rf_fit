@@ -152,7 +152,7 @@ We propose a efficent procedure to extract these coefficents from a noised signa
 
 ### 1. Side note: least square regression of an $n$-degree polynomial
 
-As described in the [lecture notes](https://www.di.ens.fr/~fbach/mlclass/lecture2.pdf) of Francis Bach, given a set of points $(x_i, y_i), i \in \llbracket 1, N \rrbracket$, one can write the empirical risk $R(w)$ associated with the least square regression of an $n$-degree polynomial with coefficients $w_0, ..., w_n$ as follow:
+As described in the [lecture notes](https://www.di.ens.fr/~fbach/mlclass/lecture2.pdf) of Francis Bach, given a set of points $(x_i, y_i), i \in$ &lobrk;1, N&robrk;, one can write the empirical risk $R(w)$ associated with the least square regression of an $n$-degree polynomial with coefficients $w_0, ..., w_n$ as follow:
 
 $$
 R_{LS}(w) = \frac{1}{N} || Xw - y ||_2^2
@@ -193,7 +193,7 @@ We take inspiration of this approach in the next section to find an efficient fi
 
 ### 2. Least square regression of a degree one rationnal function
 
-We are given a set $(\omega_i, s_i), i \in \llbracket 1, N \rrbracket$, where $\omega_i$ is a frequency and $s_i$ the signal measured by the instrument, for instance a vectorial network analyser (VNA).
+We are given a set $(\omega_i, s_i), i \in$ &lobrk;1, N&robrk;, where $\omega_i$ is a frequency and $s_i$ the signal measured by the instrument, for instance a vectorial network analyser (VNA).
 
 We whould like the find the global minimum of the least square risk. In this context it reads:
 
@@ -293,7 +293,7 @@ $$
 \sqrt{|\nabla_\omega S_X(\omega)|} = \sqrt{\left|\frac{b}{d}\left(\frac{c}{d}-\frac{a}{b} \right)\right|}\frac{1}{|c+d\omega|} \propto \frac{1}{|c+d\omega|}
 $$
 
-You can now pick your prefered empirical estimator of the gradient $\tilde{\nabla}_X(y)$ such as the convolution with the derivative of a gaussian kernel for instance. In the limite where this estimation of the gradient is accurate, we have $R_{LS}(w, m) = R^*(w, m)$, where:
+You can now pick your prefered empirical estimator of the gradient $ \tilde\nabla_X(y) $ such as the convolution with the derivative of a gaussian kernel for instance. In the limite where this estimation of the gradient is accurate, we have $R_{LS}(w, m) = R^*(w, m)$, where:
 
 $$
 R^*(w, m) = \frac{1}{N}||\mathcal{D}\left(\sqrt{|\tilde{\nabla}_X(y)|}\right) (\mathcal{D}(y)Xm - Xw)||_2^2
