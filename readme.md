@@ -150,7 +150,7 @@ $$
 
 We propose a efficent procedure to extract these coefficents from a noised signal.
 
-### 1. Side note: least square regression of an $n$-degree polynomial
+### 1. Side note: least square regression of an n-degree polynomial
 
 As described in the [lecture notes](https://www.di.ens.fr/~fbach/mlclass/lecture2.pdf) of Francis Bach, given a set of points $(x_i, y_i), i \in$ &lobrk;1, N&robrk;, one can write the empirical risk $R(w)$ associated with the least square regression of an $n$-degree polynomial with coefficients $w_0, ..., w_n$ as follow:
 
@@ -284,7 +284,7 @@ Diagonalizing this $4\times4$ matrix and looking for its eigen vector associated
 
 This is very nice and efficient to compute, though in the case of noised signals the fit while eventually fail since this risk dose not coincide with $R_{LS}(w, m)$.
 
-To solve this issue, one can observe that the $R(w, m)$ we introduce correspund to $R_{LS}(w, m)$ where each data point has been weighted by $|c+d\omega|$ which has the bad taste of being maximal away from the resonance. Fortunately for us, it happens that the empirical gradient of the signal encodes for this quantity:
+To solve this issue, one can observe that the $R(w, m)$ we introduce corresponds to $R_{LS}(w, m)$ where each data point has been weighted by $|c+d\omega|$ which has the bad taste of being maximal away from the resonance. Fortunately for us, it happens that the empirical gradient of the signal encodes for this quantity:
 
 $$
 \sqrt{|\nabla_\omega S_X(\omega)|} = \sqrt{\left|\frac{b}{d}\left(\frac{c}{d}-\frac{a}{b} \right)\right|}\frac{1}{|c+d\omega|} \propto \frac{1}{|c+d\omega|}
