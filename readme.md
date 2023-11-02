@@ -290,7 +290,7 @@ $$
 \sqrt{|\nabla_\omega S_X(\omega)|} = \sqrt{\left|\frac{b}{d}\left(\frac{c}{d}-\frac{a}{b} \right)\right|}\frac{1}{|c+d\omega|} \propto \frac{1}{|c+d\omega|}
 $$
 
-You can now pick your prefered empirical estimator of the gradient $ \tilde\nabla_X(y) $ such as the convolution with the derivative of a gaussian kernel for instance. In the limite where this estimation of the gradient is accurate, we have $R_{LS}(w, m) = R^*(w, m)$, where:
+You can now pick your prefered empirical estimator of the gradient $\tilde\nabla_X(y)$ such as the convolution with the derivative of a gaussian kernel for instance. In the limite where this estimation of the gradient is accurate, we have $R_{LS}(w, m) = R^*(w, m)$, where:
 
 $$
 R^*(w, m) = \frac{1}{N}||\mathcal{D}\left(\sqrt{|\tilde{\nabla}_X(y)|}\right) (\mathcal{D}(y)Xm - Xw)||_2^2
