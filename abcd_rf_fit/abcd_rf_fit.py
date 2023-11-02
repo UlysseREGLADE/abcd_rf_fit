@@ -1,5 +1,6 @@
 from inspect import signature
 import numpy as np
+import warnings
 
 from .utils import (
     guess_edelay_from_gradient,
@@ -203,7 +204,11 @@ def fit_signal(
     fit_func = get_fit_function(geometry, fit_amplitude, fit_edelay)
 
     if final_ls_opti:
-
         params, _ = complex_fit(fit_func, freq, signal, params)
+    
+    resonator_params = ResonatorParams(params, geometry)
+
+    if resonator_params.phi_0 is not None and  np.abs(resonator_params.phi_0) > 0.25:
+        warnings.warn("Extracted phi_0 greater than 0.25, this might indicate a big impedance mismatch, values of kappa_i and kappa_c might be affected, you can try to set: allow_mismatch=False", UserWarning)
 
     return fit_func, ResonatorParams(params, geometry)

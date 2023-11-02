@@ -2,7 +2,7 @@
 
 ## 0) Why spending time on this problem ?
 
-Fitting resonators is really the bread and butter of the circuit QED engineer. Hence it is absolutely crucial to have fast and reliable routines to perform this task.
+Fitting resonators is really the bread and butter of the circuit QED engineer. Hence, it is absolutely crucial to have fast and reliable routines to perform this task.
 
 To the best of my knowledge, there is currently no satisfying method in the literature to efficiently perform the fit of the scattering parameter of a resonator, apart from the one described in [this paper](https://arxiv.org/pdf/1410.3365.pdf) from 2014. This method is far from being perfect and has two main flaws:
 
@@ -23,7 +23,7 @@ a^i_{out}-a^i_{in} &= \sqrt{\kappa_c}a \\
 \end{align}
 $$
 
-In the rotating frame at $\omega$ the Hamiltonian we consider the one of a bar linear resonator:
+In the rotating frame at $\omega$, the Hamiltonian we consider the one of a bar linear resonator:
 
 $$
 H/\hbar = (\omega-\omega_0)a^\dagger a
@@ -109,7 +109,7 @@ In practise, adding this degree of freedom to the formula loosens the precision 
 
 ### 5. Reflection with impedance mismatch
 
-Taking inspiration for what was done for the hanger, we allow the rotation around $1$ in the complex plan by writing the input/output relation as follow:
+Taking inspiration for what was done for the hanger, we allow the rotation around $1$ in the complex plan by writing the input/output relation as follow. THERE IS NO PHYSICAL INTUITION BEHIND THIS FORMULA AND IT IS WRITTEN PURELY BY ANALOGY:
 
 $$
 a^i_{out}-a^i_{in} = e^{i\phi_0}\sqrt{\kappa^i_c}a
@@ -121,7 +121,7 @@ $$
 S_{RM}(\omega) = \frac{i(\omega-\omega_0) + \kappa_i/2 + (1/2 - e^{i\phi_0})\kappa_c/2}{i(\omega-\omega_0) + (\kappa_i+\kappa_c)/2}
 $$
 
-Again, the precision on the fit of $\kappa_i$ and $\kappa_c$ are loosened, and this formula is to be taken with the same caveat than the previous one.
+Again, the precision of the fit of $\kappa_i$ and $\kappa_c$ are loosened, and this formula is to be taken with the same caveat than the previous one. abcd_rf_fit will return a warning when the value of $\phi_0$ in greater than 0.25 .
 
 ### Effect of electrical delay and amplification chain
 
