@@ -323,4 +323,5 @@ $$
 \lambda \in \left[ \lambda_\text{flat} - \frac{1.5}{\max_{i}(\omega_i)-\min_{i}(\omega_i)}, \lambda_\text{flat} + \frac{1.5}{\max_{i}(\omega_i)-\min_{i}(\omega_i)} \right]
 $$
 
+
 This simple method proves to be really efficient.
