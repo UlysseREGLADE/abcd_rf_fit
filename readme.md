@@ -268,16 +268,13 @@ B, 0_2
 \end{align}
 $$
 
-Leadging to:
+Leading to:
 
 $$
 \begin{bmatrix}
 w \\
 m
-\end{bmatrix}
-=
-C
-\begin{bmatrix}
+\end{bmatrix} = C \begin{bmatrix}
 w \\
 m
 \end{bmatrix}
