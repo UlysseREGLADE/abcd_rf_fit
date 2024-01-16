@@ -53,25 +53,29 @@ def abcd2params(abcd, geometry):
 
     if resonator_dict[geometry] == reflection:
 
-        kappa_c = np.real(1j * (c / d - a / b))
-        kappa_i = -np.imag(a / b + c / d)
         f_0 = -0.5 * np.real(a / b + c / d)
         a_in = b / d
 
-        return f_0, kappa_i, kappa_c, np.real(a_in), np.imag(a_in)
+        kappa_c_real = np.real(1j * (c / d - a / b))
+        kappa_i = -np.imag(a / b + c / d)
+        kappa = kappa_i + kappa_c_real
+
+        return f_0, kappa, kappa_c_real, np.real(a_in), np.imag(a_in)
 
     if resonator_dict[geometry] == reflection_mismatched:
 
-        kappa_c_h = 2 * np.abs(a / b - c / d)
-        phi_0 = np.angle(1j * (c / d - a / b))
-        kappa_i_h = -2 * np.imag(c / d) - kappa_c_h
         f_0 = -np.real(c / d)
         a_in = b / d
 
-        kappa_c = kappa_c_h / 2
-        kappa_i = kappa_i_h + kappa_c_h / 2
+        kappa_c_imag = np.real(a / b - c / d)
+        kappa_c_real = np.real(1j * (c / d - a / b))
+        kappa_i = -np.imag(a / b + c / d)
 
-        return f_0, kappa_i, kappa_c, phi_0, np.real(a_in), np.imag(a_in)
+        kappa = kappa_i + kappa_c_real
+
+        phi_0 = np.angle(kappa_c_real - 1j*kappa_c_imag)
+
+        return f_0, kappa, kappa_c_real, phi_0, np.real(a_in), np.imag(a_in)
 
     elif resonator_dict[geometry] == transmission:
 
@@ -93,20 +97,27 @@ def abcd2params(abcd, geometry):
         f_0 = -0.5 * np.real(a / b + c / d)
         a_in = b / d
 
-        kappa_c = 2 * kappa_c_r
+        kappa_c_real = 2 * kappa_c_r
         kappa_i = kappa_i_r - kappa_c_r
 
-        return f_0, kappa_i, kappa_c, np.real(a_in), np.imag(a_in)
+        kappa = kappa_i + kappa_c_real
+
+        return f_0, kappa, kappa_c_real, np.real(a_in), np.imag(a_in)
 
     elif resonator_dict[geometry] == hanger_mismatched:
 
-        kappa_c = 2 * np.abs(a / b - c / d)
-        phi_0 = np.angle(1j * (c / d - a / b))
-        kappa_i = -2 * np.imag(c / d) - kappa_c
         f_0 = -np.real(c / d)
         a_in = b / d
 
-        return f_0, kappa_i, kappa_c, phi_0, np.real(a_in), np.imag(a_in)
+        kappa_c_imag = 2*np.real(a / b - c / d)
+        kappa_c_real = 2*np.real(1j * (c / d - a / b))
+        kappa_i = -2 * np.imag(c / d) - kappa_c_real
+
+        kappa = kappa_i + kappa_c_real
+
+        phi_0 = np.angle(kappa_c_real - 1j*kappa_c_imag)
+
+        return f_0, kappa, kappa_c_real, phi_0, np.real(a_in), np.imag(a_in)
 
 
 def get_fit_function(geometry, amplitude=True, edelay=True):

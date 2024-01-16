@@ -23,23 +23,23 @@ def transmission(freq, f_0, kappa):
     return num / zeros2eps(den)
 
 
-def reflection(freq, f_0, kappa_i, kappa_c, phi_0=0):
+def reflection(freq, f_0, kappa, kappa_c_real, phi_0=0):
 
-    num = 1j * (freq - f_0) + kappa_i / 2 + kappa_c * (0.5 - np.exp(1j * phi_0))
-    den = 1j * (freq - f_0) + (kappa_c + kappa_i) / 2
+    num = 2j * (freq - f_0) + kappa - 2*kappa_c_real*(1+1j*np.tan(phi_0))
+    den = 2j * (freq - f_0) + kappa
 
     return num / zeros2eps(den)
 
 
-def reflection_mismatched(freq, f_0, kappa_i, kappa_c, phi_0):
+def reflection_mismatched(freq, f_0, kappa, kappa_c_real, phi_0):
 
-    return reflection(freq, f_0, kappa_i, kappa_c, phi_0)
+    return reflection(freq, f_0, kappa, kappa_c_real, phi_0)
 
 
-def hanger(freq, f_0, kappa_i, kappa_c, phi_0=0):
+def hanger(freq, f_0, kappa, kappa_c_real, phi_0=0):
 
-    num = 1j * (freq - f_0) + kappa_i / 2 + kappa_c / 2 * (1 - np.exp(1j * phi_0))
-    den = 1j * (freq - f_0) + (kappa_c + kappa_i) / 2
+    num = 2j * (freq - f_0) + kappa - kappa_c_real*(1+1j*np.tan(phi_0))
+    den = 2j * (freq - f_0) + kappa
 
     return num / zeros2eps(den)
 
@@ -80,8 +80,8 @@ class ResonatorParams(object):
 
         if self.resonator_func in [reflection, hanger]:
             self.f_0_index = 0
-            self.kappa_i_index = 1
-            self.kappa_c_index = 2
+            self.kappa_index = 1
+            self.kappa_c_real_index = 2
             if len(self.params) in [5, 6]:
                 self.re_a_in_index = 3
                 self.im_a_in_index = 4
@@ -90,8 +90,8 @@ class ResonatorParams(object):
 
         if self.resonator_func in [reflection_mismatched, hanger_mismatched]:
             self.f_0_index = 0
-            self.kappa_i_index = 1
-            self.kappa_c_index = 2
+            self.kappa_index = 1
+            self.kappa_c_real_index = 2
             self.phi_0_index = 3
             if len(self.params) in [6, 7]:
                 self.re_a_in_index = 3
@@ -114,21 +114,25 @@ class ResonatorParams(object):
         if hasattr(self, "kappa_index"):
             return self.params[self.kappa_index]
         else:
-            return self.params[self.kappa_i_index] + self.params[self.kappa_c_index]
+            None
 
     @property
     def kappa_i(self):
-        if hasattr(self, "kappa_i_index"):
-            return self.params[self.kappa_i_index]
+        if hasattr(self, "kappa_index") and hasattr(self, "kappa_c_real_index"):
+            return self.params[self.kappa_index] - self.params[self.kappa_c_real_index]
+        else:
+            return None
+
+    @property
+    def kappa_c_real(self):
+        if hasattr(self, "kappa_c_real_index"):
+            return self.params[self.kappa_c_real_index]
         else:
             return None
 
     @property
     def kappa_c(self):
-        if hasattr(self, "kappa_c_index"):
-            return self.params[self.kappa_c_index]
-        else:
-            return None
+        return self.kappa_c_real
 
     @property
     def a_in(self):
