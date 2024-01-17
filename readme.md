@@ -93,16 +93,28 @@ Again, $\omega_0$, $\kappa_i$ and $\kappa_c$ are fittable.
 
 ### 4. Hanger with impedance mismatch
 
-In [this paper](https://arxiv.org/pdf/1410.3365.pdf) from 2014 is described how to take into account the effect of an impedance mismatch in the context of the hanger geometry. One should introduce the parameter $\phi_0$ in the scattering parameter of the hanger as follow:
+In [this paper](https://arxiv.org/pdf/1410.3365.pdf) from 2014 is described how to take into account the effect of an impedance mismatch in the context of the hanger geometry. In this case, $\kappa_c$ can be view as a complex number, in this situation, we write:
 
 $$
-S_{HM}(\omega) = \frac{i(\omega-\omega_0) + (1-e^{i\phi_0})\kappa_i/2}{i(\omega-\omega_0) + (\kappa_i+\kappa_c)/2}
+\kappa_c = |\kappa_c|e^{i\phi_0}
+$$
+
+In this case, only the real part of the complex coupling rates contribute to the total loss-rate of the cavity $\kappa$ .
+
+$$
+\kappa = \kappa_i + \Re(\kappa_c)
+$$
+
+One should introduce the parameter $\phi_0$ in the scattering parameter of the hanger as follow:
+
+$$
+S_{HM}(\omega) = \frac{2i(\omega-\omega_0) + \kappa - \Re(\kappa_c)(1+i\tan(\phi_0))}{2i(\omega-\omega_0) + \kappa}
 $$
 
 From a geometrical point of view in the complex plan, it allows the rotation of the circle described by $S_H(\omega)$ around $1$. Empirically, one can also see it as a modification of the input/output relation:
 
 $$
-a^i_{out}-a^i_{in} = e^{i\phi_0}\frac{\sqrt{\kappa^i_c}}{2}a
+a^i_{out}-a^i_{in} = \frac{\sqrt{|\kappa^i_c| e^{i\phi_0}}}{2}a
 $$
 
 In practise, adding this degree of freedom to the formula loosens the precision of the fit of $\kappa_i$ and $\kappa_c$. Hence, one should be cautious when allowing for this offset.
@@ -112,13 +124,13 @@ In practise, adding this degree of freedom to the formula loosens the precision 
 Taking inspiration for what was done for the hanger, we allow the rotation around $1$ in the complex plan by writing the input/output relation as follow. THERE IS NO PHYSICAL INTUITION BEHIND THIS FORMULA AND IT IS WRITTEN PURELY BY ANALOGY:
 
 $$
-a^i_{out}-a^i_{in} = e^{i\phi_0}\sqrt{\kappa^i_c}a
+a^i_{out}-a^i_{in} = \sqrt{|\kappa^i_c|e^{i\phi_0}}a
 $$
 
 The modified scattering parameter for the reflection geometry is as follow:
 
 $$
-S_{RM}(\omega) = \frac{i(\omega-\omega_0) + \kappa_i/2 + (1/2 - e^{i\phi_0})\kappa_c/2}{i(\omega-\omega_0) + (\kappa_i+\kappa_c)/2}
+S_{RM}(\omega) = \frac{2i(\omega-\omega_0) + \kappa -  2\Re(\kappa_c)(1+i\tan(\phi_0))}{2i(\omega-\omega_0) + \kappa}
 $$
 
 Again, the precision of the fit of $\kappa_i$ and $\kappa_c$ are loosened, and this formula is to be taken with the same caveat than the previous one. abcd_rf_fit will return a warning when the value of $\phi_0$ in greater than 0.25 .
