@@ -44,9 +44,9 @@ def hanger(freq, f_0, kappa, kappa_c_real, phi_0=0):
     return num / zeros2eps(den)
 
 
-def hanger_mismatched(freq, f_0, kappa_i, kappa_c, phi_0):
+def hanger_mismatched(freq, f_0, kappa, kappa_c_real, phi_0):
 
-    return hanger(freq, f_0, kappa_i, kappa_c, phi_0)
+    return hanger(freq, f_0, kappa, kappa_c_real, phi_0)
 
 
 resonator_dict = {
