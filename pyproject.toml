@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "abcd_rf_fit"
+version = "0.0.0"
+readme = "README.md"
+
+[tools.setuptools]
+python-version = ">3.7"
+
+dependencies = [
+]
+
+[tool.setuptools.packages.find]
+include = ['abcd_rf_fit*']
+
+[project.urls]
+"Homepage" = "https://github.com/Quantronics/abcd_rf_fit"
