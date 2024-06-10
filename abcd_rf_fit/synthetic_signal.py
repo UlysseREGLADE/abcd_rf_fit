@@ -53,6 +53,11 @@ def get_synthetic_resonance(freq, geometry="r"):
         params = [f_0, kappa, kappa_c_real, phi_0]
     elif resonator_func == hanger_mismatched:
         params = [f_0, kappa, kappa_c_real, phi_0]
+    elif resonator_func == purcell_reflection:
+        kappa_purcell = (0.001 + 0.29 * np.random.rand()) * freq_span
+        f_0_purcell = (0.25 + np.random.rand() * 0.5) * freq_span + freq[0]
+        g = (0.001 + 0.29 * np.random.rand()) * freq_span
+        params = [f_0, f_0_purcell, kappa, kappa_purcell, g]
 
     return resonator_func(freq, *params), params
 

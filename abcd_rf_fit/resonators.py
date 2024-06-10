@@ -48,6 +48,16 @@ def hanger_mismatched(freq, f_0, kappa, kappa_c_real, phi_0):
 
     return hanger(freq, f_0, kappa, kappa_c_real, phi_0)
 
+def purcell_reflection(freq, f_a_0, f_b_0, kappa_a, kappa_b, g):
+
+    delta_a = freq - f_a_0
+    delta_b = freq - f_b_0
+
+    num = (1j * delta_b - 0.5 * kappa_b) * (1j * delta_a + 0.5 * kappa_a) + g ** 2
+    den = (1j * delta_b + 0.5 * kappa_b) * (1j * delta_a + 0.5 * kappa_a) + g ** 2
+
+    return num / den
+
 
 resonator_dict = {
     "transmission": transmission,
@@ -60,6 +70,8 @@ resonator_dict = {
     "h": hanger,
     "hanger_mismatched": hanger_mismatched,
     "hm": hanger_mismatched,
+    "purcell_reflection": purcell_reflection,
+    "pr": purcell_reflection
 }
 
 
@@ -98,6 +110,18 @@ class ResonatorParams(object):
                 self.im_a_in_index = 4
             if len(self.params) in [5, 7]:
                 self.edelay_index = -1
+        
+        if self.resonator_func in [purcell_reflection]:
+            self.f_0_index = 0
+            self.f_0_purcell_index = 1
+            self.kappa_index = 2
+            self.kappa_purcell_index = 3
+            self.g_index = 4
+            if len(self.params) in [7, 8]:
+                self.re_a_in_index = 3
+                self.im_a_in_index = 4
+            if len(self.params) in [6, 8]:
+                self.edelay_index = -1
 
     def tolist(self):
         return np.array(self.params)
@@ -106,6 +130,13 @@ class ResonatorParams(object):
     def f_0(self):
         if hasattr(self, "f_0_index"):
             return self.params[self.f_0_index]
+        else:
+            return None
+
+    @property
+    def f_0_purcell(self):
+        if hasattr(self, "f_0_purcell_index"):
+            return self.params[self.f_0_purcell_index]
         else:
             return None
 
@@ -133,6 +164,20 @@ class ResonatorParams(object):
     @property
     def kappa_c(self):
         return self.kappa_c_real
+    
+    @property
+    def kappa_purcell(self):
+        if hasattr(self, "kappa_purcell_index"):
+            return self.params[self.kappa_purcell_index]
+        else:
+            None
+    
+    @property
+    def g(self):
+        if hasattr(self, "g_index"):
+            return self.params[self.g_index]
+        else:
+            None
 
     @property
     def a_in(self):
@@ -176,10 +221,13 @@ class ResonatorParams(object):
     def str(self, latex=False, separator=", ", precision=2, only_f_and_kappa=False, f_precision=2):
 
         kappa = {False: "kappa/2pi", True: r"$\kappa/2\pi$"}
+        kappa_purcell = {False: "kappa_p/2pi", True: r"$\kappa_p/2\pi$"}
         kappa_i = {False: "kappa_i/2pi", True: r"$\kappa_i/2\pi$"}
         kappa_c = {False: "kappa_c/2pi", True: r"$\kappa_c/2\pi$"}
         phi_0 = {False: "phi_0", True: r"$\varphi_0$"}
         f_0 = {False: "f_0", True: r"$f_0$"}
+        f_0_purcell = {False: "f_0p", True: r"$f_{0p}$"}
+        g = {False: "g", True: r"$g$"}
 
         if self.edelay is not None:
             edelay_str = "%sedelay = %ss" % (separator, get_prefix_str(self.edelay, precision))
@@ -192,11 +240,23 @@ class ResonatorParams(object):
                 kappa[latex],
                 get_prefix_str(self.kappa, precision),
             )
+        elif self.resonator_func == purcell_reflection:
+            kappa_str = r"%s%s = %sHz%s%s = %sHz%s%s = %sHz" % (
+                separator,
+                kappa[latex],
+                get_prefix_str(self.kappa, precision),
+                separator,
+                kappa_purcell[latex],
+                get_prefix_str(self.kappa_purcell, precision),
+                separator,
+                g[latex],
+                get_prefix_str(self.g, precision),
+            )
         else:
             kappa_str = r"%s%s = %sHz%s%s = %sHz" % (
                 separator,
-                kappa_i[latex],
-                get_prefix_str(self.kappa_i, precision),
+                kappa[latex],
+                get_prefix_str(self.kappa, precision),
                 separator,
                 kappa_c[latex],
                 get_prefix_str(self.kappa_c, precision),
@@ -207,7 +267,16 @@ class ResonatorParams(object):
         else:
             phi_0_str = ""
 
-        f_0_str = r"%s = %sHz" % (f_0[latex], get_prefix_str(self.f_0, f_precision))
+        if self.resonator_func == purcell_reflection:
+            f_0_str = r"%s = %sHz%s%s = %sHz" % (
+                f_0[latex],
+                get_prefix_str(self.f_0, f_precision),
+                separator,
+                f_0_purcell[latex],
+                get_prefix_str(self.f_0_purcell, f_precision)
+            )
+        else:
+            f_0_str = r"%s = %sHz" % (f_0[latex], get_prefix_str(self.f_0, f_precision))
 
         if only_f_and_kappa:
             return f_0_str + kappa_str

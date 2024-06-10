@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from scipy.special import comb
-from utils import complex_fit
+from .utils import complex_fit, smooth_gradient
 
 def fit_rational_fraction_pole_basis(x, y, n, poles = None, den = None):
     if den is None:
@@ -12,6 +12,14 @@ def fit_rational_fraction_pole_basis(x, y, n, poles = None, den = None):
         poles = np.linspace(np.min(x), np.max(x), n+2, dtype=complex)
         poles = 0.5*(poles[1:] + poles[:-1])
         poles += np.mean(np.diff(poles))*1j*(-1)**(np.arange(n+1))
+    elif poles == "rand":
+        poles = []
+        while len(poles) < n+1:
+            while True:
+                pole = np.random.rand()*2 + np.random.rand()*2j - 1 - 1j
+                if np.abs(pole) <= 1:
+                    break
+            poles.append(pole)
     
     pole_mesh, x_mesh = np.meshgrid(poles, x)
 
@@ -81,6 +89,10 @@ def iterative_solver(x, y, n, min_rec_depth=10, max_rec_depth=100, convergance_p
     span = np.max(np.abs(x-center))
     x_norm = (x-center)/span
     
+    den = np.abs(smooth_gradient(y))**-1
+    den_coef = np.polyfit(x, den, 2)
+    den = np.poly1d(den_coef)(x)
+
     num, den = fit_rational_fraction_pole_basis(x_norm, y, n=n)
     num, den, solution = fit_rational_fraction_polynomial_basis(x_norm, y, n=n, den=den)
 
@@ -102,6 +114,51 @@ def iterative_solver(x, y, n, min_rec_depth=10, max_rec_depth=100, convergance_p
         if convergence_criteria(np.array(residuals), convergance_precision, min_converged_passes):
             return num, den, solution, residuals
     
+    return num, den, solution, residuals
+
+def randomized_iterative_solver(x, y, n, den = None, min_rec_depth=10, max_rec_depth=100, convergance_precision=0.01, min_converged_passes=5):
+    residuals = []
+
+    center = 0.5*(np.max(x) + np.min(x))
+    span = np.max(np.abs(x-center))
+    x_norm = (x-center)/span
+
+    num = np.ones(len(x))
+    if den is None:
+        den = np.ones(len(x))
+
+    def iterate(num, den):
+        rand_id = np.random.randint(0, 2)
+        # rand_id = 0
+        if rand_id == 0:
+            num, den, solution = fit_rational_fraction_polynomial_basis(x_norm, y, n=n, den=den)
+            return num, den
+        elif rand_id == 1:
+            return fit_rational_fraction_pole_basis(x_norm, y, n=n, den=den)
+        elif rand_id == 2:
+            den, num, solution = fit_rational_fraction_polynomial_basis(x_norm, 1/y, n=n, den=num)
+            return num, den
+        else:
+            den, num = fit_rational_fraction_pole_basis(x_norm, 1/y, n=n, den=num)
+            return num, den
+
+    for _ in range(max(min_rec_depth, min_converged_passes)):
+        num, den = iterate(num, den)
+        residuals.append(np.sum(np.abs(y-num/den)))
+
+    if convergence_criteria(np.array(residuals), convergance_precision, min_converged_passes):
+        num, den, solution = fit_rational_fraction_polynomial_basis(x_norm, y, n=n, den=den)
+        return num, den, solution, residuals
+    
+    for _ in range(max(max_rec_depth - min_rec_depth, 0)):
+        num, den = iterate(num, den)
+        residuals.append(np.sum(np.abs(y-num/den)))
+
+        if convergence_criteria(np.array(residuals), convergance_precision, min_converged_passes):
+            num, den, solution = fit_rational_fraction_polynomial_basis(x_norm, y, n=n, den=den)
+            return num, den, solution, residuals
+    
+    num, den, solution = fit_rational_fraction_polynomial_basis(x_norm, y, n=n, den=den)
     return num, den, solution, residuals
 
 def convert_solution(x, solution):
@@ -140,7 +197,7 @@ def get_rationnal_fit(x, y, n, return_true_solution=True, return_residuals=False
     else:
         return solution, num/den
 
-def rationnal_function(x, coefs):
+def rationnal_function(x, coefs, return_den=False):
     n = (len(coefs) // 2) - 1
 
     n_mesh, x_mesh = np.meshgrid(np.arange(n+1), x)
@@ -149,7 +206,9 @@ def rationnal_function(x, coefs):
     num = x_design.T @ coefs[:n+1]
     den = x_design.T @ coefs[n+1:]
 
-    return num/den
+    if not return_den:
+        return num/den
+    return num/den, den
 
 def reflection_purcell(freq, f_a_0, f_b_0, kappa_a, kappa_b, g):
     delta_a = freq - f_a_0
@@ -162,12 +221,13 @@ def reflection_purcell(freq, f_a_0, f_b_0, kappa_a, kappa_b, g):
 
 if __name__ == "__main__":
 
-    noise = 0.1
+    noise = 0.01
     n = 2
-    x = np.linspace(-5, 10, 1001)
+    x = np.linspace(-12, 10, 1001)
     coefs = np.random.rand(2*(n+1)) + 1j*np.random.rand(2*(n+1))
-    y = rationnal_function(x, coefs) + noise*np.random.normal(0, 1, (x.size)) + noise*1j*np.random.normal(0, 1, (x.size))
-
+    y, den = rationnal_function(x, coefs, return_den=True)
+    y += noise*np.random.normal(0, 1, (x.size)) + noise*1j*np.random.normal(0, 1, (x.size))
+    # y = 1/y
     # y = reflection_purcell(x, -2, -1, 0.1, 3, 0.5) + noise*np.random.normal(0, 1, (x.size)) + noise*1j*np.random.normal(0, 1, (x.size))
 
     def fit_func(x, *args):
@@ -175,11 +235,24 @@ if __name__ == "__main__":
         coefs = np.array(args[:n]) + 1j*np.array(args[n:])
         return rationnal_function(x, coefs)
     
-    solution, fit = get_rationnal_fit(x, y, n=n)
+    solution, fit, residuals = get_rationnal_fit(x, y, n=n, return_residuals=True)
     popt, pcov = complex_fit(fit_func, x, y, p0=np.array([*solution.real, *solution.imag], dtype=float))
     better_solution = np.array(popt[:len(popt)//2]) + 1j*np.array(popt[len(popt)//2:])
 
     print(popt)
+
+    z = np.polyfit(x, np.abs(smooth_gradient(y))**-1, 2)
+    p = np.poly1d(z)
+
+    plt.plot(np.abs(den)/np.abs(den[0]))
+    plt.plot(np.abs(smooth_gradient(y))**-1/(np.abs(smooth_gradient(y)[0])**-1))
+    plt.plot(p(x)/p(x)[0])
+    plt.show()
+
+
+    plt.figure()
+    plt.plot(residuals)
+    plt.show()
 
     plt.figure()
     plt.plot(np.abs(coefs/coefs[0]), 'oC0')
@@ -187,7 +260,7 @@ if __name__ == "__main__":
     plt.scatter(np.arange(2*(n+1)), np.abs(better_solution/better_solution[0]), facecolor='none', edgecolors='C2', zorder=100)
 
     plt.figure()
-    plt.plot(x, np.angle(y))
-    plt.plot(x, np.angle(fit))
-    plt.plot(x, np.angle(fit_func(x, *popt)))
+    plt.plot(x, np.real(y))
+    plt.plot(x, np.real(fit))
+    plt.plot(x, np.real(fit_func(x, *popt)))
     plt.show()
