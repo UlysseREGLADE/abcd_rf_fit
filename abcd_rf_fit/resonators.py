@@ -1,4 +1,5 @@
 import numpy as np
+from copy import deepcopy
 
 if __name__ == "__main__":
 
@@ -48,16 +49,15 @@ def hanger_mismatched(freq, f_0, kappa, kappa_c_real, phi_0):
 
     return hanger(freq, f_0, kappa, kappa_c_real, phi_0)
 
-def purcell_reflection(freq, f_a_0, f_b_0, kappa_a, kappa_b, g):
+def purcell_reflection(freq, f_0, f_0_p, kappa, kappa_p, g):
 
-    delta_a = freq - f_a_0
-    delta_b = freq - f_b_0
+    delta_a = freq - f_0
+    delta_b = freq - f_0_p
 
-    num = (1j * delta_b - 0.5 * kappa_b) * (1j * delta_a + 0.5 * kappa_a) + g ** 2
-    den = (1j * delta_b + 0.5 * kappa_b) * (1j * delta_a + 0.5 * kappa_a) + g ** 2
+    num = (1j * delta_b - 0.5 * kappa_p) * (1j * delta_a + 0.5 * kappa) + g ** 2
+    den = (1j * delta_b + 0.5 * kappa_p) * (1j * delta_a + 0.5 * kappa) + g ** 2
 
     return num / den
-
 
 resonator_dict = {
     "transmission": transmission,
@@ -74,6 +74,40 @@ resonator_dict = {
     "pr": purcell_reflection
 }
 
+def get_fit_function(geometry, amplitude=True, edelay=True):
+    if type(geometry) == str:
+        resonator_func = resonator_dict[geometry]
+    else:
+        resonator_func = geometry
+
+    if not amplitude and not edelay:
+        return resonator_func
+
+    elif amplitude and not edelay:
+        def fit_func(*args):
+            return resonator_func(*args[:-2]) * (args[-2] + 1j * args[-1])
+
+        return fit_func
+
+    elif not amplitude and edelay:
+        def fit_func(*args):
+            return resonator_func(*args[:-1]) * np.exp(2j * np.pi * args[-1] * args[0])
+
+        return fit_func
+
+    elif amplitude and edelay:
+        def fit_func(*args):
+            return (
+                resonator_func(*args[:-3])
+                * (args[-3] + 1j * args[-2])
+                * np.exp(2j * np.pi * args[-1] * args[0])
+            )
+
+        return fit_func
+
+    else:
+
+        raise Exception("Unreachable")
 
 class ResonatorParams(object):
     def __init__(self, params, geometry):
@@ -219,7 +253,6 @@ class ResonatorParams(object):
             return None
 
     def str(self, latex=False, separator=", ", precision=2, only_f_and_kappa=False, f_precision=2):
-
         kappa = {False: "kappa/2pi", True: r"$\kappa/2\pi$"}
         kappa_purcell = {False: "kappa_p/2pi", True: r"$\kappa_p/2\pi$"}
         kappa_i = {False: "kappa_i/2pi", True: r"$\kappa_i/2\pi$"}
@@ -241,17 +274,18 @@ class ResonatorParams(object):
                 get_prefix_str(self.kappa, precision),
             )
         elif self.resonator_func == purcell_reflection:
-            kappa_str = r"%s%s = %sHz%s%s = %sHz%s%s = %sHz" % (
+            kappa_str = r"%s%s = %sHz%s%s = %sHz" % (
                 separator,
                 kappa[latex],
                 get_prefix_str(self.kappa, precision),
                 separator,
                 kappa_purcell[latex],
                 get_prefix_str(self.kappa_purcell, precision),
-                separator,
-                g[latex],
-                get_prefix_str(self.g, precision),
             )
+            if self.g is not None:
+                kappa_str += r"%s%s = %sHz" % (separator,
+                                               g[latex],
+                                               get_prefix_str(self.g, precision))
         else:
             kappa_str = r"%s%s = %sHz%s%s = %sHz" % (
                 separator,
@@ -284,13 +318,42 @@ class ResonatorParams(object):
             return f_0_str + kappa_str + phi_0_str + edelay_str
 
     def __str__(self) -> str:
-
         return self.str()
 
     def __repr__(self):
-
         return self.str()
 
+    def __call__(self, freq, *args, **kwargs):
+        amplitude = self.a_in is not None
+        edelay = self.edelay is not None
+
+        fit_func = get_fit_function(self.resonator_func, amplitude, edelay)
+
+        if len(args) == 0 and len(kwargs) == 0:
+            params = self.params
+        else:
+            if len(kwargs) == 0:
+                params = np.copy(self.params)
+                params[:len(args)] = args
+            else:
+                resonator = deepcopy(self)
+                for key in kwargs:
+                    resonator.params[resonator.__dict__[key + "_index"]] = kwargs[key]
+                resonator.params[:len(args)] = args
+                params = resonator.params
+        
+        return fit_func(freq, *params)
+
+def get_dressed_modes_purcell(res):
+    assert res.resonator_func == purcell_reflection
+
+    mat = np.array([[0.5j*res.kappa + res.f_0, res.g],
+                    [res.g, 0.5j*res.kappa_purcell + res.f_0_purcell]])
+    
+    v, _ = np.linalg.eig(mat*1e-9)
+    v *= 1e9
+
+    return ResonatorParams([v[0].real, v[1].real, 2*v[0].imag, 2*v[1].imag, None], 'pr')
 
 if __name__ == "__main__":
 
