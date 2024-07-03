@@ -145,44 +145,6 @@ def abcd2params(abcd, geometry):
 
         return f_a_0, f_b_0, kappa_a, kappa_b, g, np.real(a_in), np.imag(a_in)
 
-
-def get_fit_function(geometry, amplitude=True, edelay=True):
-    resonator_func = resonator_dict[geometry]
-
-    if not amplitude and not edelay:
-
-        return resonator_func
-
-    elif amplitude and not edelay:
-
-        def fit_func(*args):
-            return resonator_func(*args[:-2]) * (args[-2] + 1j * args[-1])
-
-        return fit_func
-
-    elif not amplitude and edelay:
-
-        def fit_func(*args):
-            return resonator_func(*args[:-1]) * np.exp(2j * np.pi * args[-1] * args[0])
-
-        return fit_func
-
-    elif amplitude and edelay:
-
-        def fit_func(*args):
-            return (
-                resonator_func(*args[:-3])
-                * (args[-3] + 1j * args[-2])
-                * np.exp(2j * np.pi * args[-1] * args[0])
-            )
-
-        return fit_func
-
-    else:
-
-        raise Exception("Unreachable")
-
-
 def meta_fit_edelay(freq, signal, relative_edelay_span, quick_fit=None):
     if quick_fit is None:
         def quick_fit(freq, signal):
@@ -274,3 +236,23 @@ def fit_signal(
     if return_abcd:
         return fit_func, ResonatorParams(params, geometry), abcd
     return fit_func, ResonatorParams(params, geometry)
+
+def analyze(
+    freq,
+    signal,
+    geometry,
+    fit_amplitude=True,
+    fit_edelay=True,
+    final_ls_opti=True,
+    allow_mismatch=True,
+    return_abcd=False,
+):
+    return fit_signal(
+        freq,
+        signal,
+        geometry,
+        fit_amplitude,
+        fit_edelay,
+        final_ls_opti,
+        allow_mismatch,
+        return_abcd)[1]
