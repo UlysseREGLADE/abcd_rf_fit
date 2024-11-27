@@ -166,7 +166,7 @@ def meta_fit_edelay(freq, signal, rec_depth=0):
 
     edelay_span = 1.5 / (np.max(freq) - np.min(freq))
 
-    edelay_array = guess_edelay + np.linspace(-1, 1, 1001) * edelay_span
+    edelay_array = guess_edelay + np.linspace(-1, 1, 21) * edelay_span
     l2_error_array = np.zeros_like(edelay_array)
 
     for i, ed in enumerate(edelay_array):
