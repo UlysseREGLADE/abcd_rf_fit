@@ -188,6 +188,7 @@ def fit_signal(
     final_ls_opti=True,
     allow_mismatch=True,
     rec_depth=1,
+    suppress_warnings=False, 
 ):
 
     if fit_edelay:
@@ -219,7 +220,10 @@ def fit_signal(
     
     resonator_params = ResonatorParams(params, geometry)
 
-    if resonator_params.phi_0 is not None and  np.abs(resonator_params.phi_0) > 0.25:
-        warnings.warn("Extracted phi_0 greater than 0.25, this might indicate a big impedance mismatch, values of kappa_i and kappa_c might be affected, you can try to set: allow_mismatch=False", UserWarning)
-
+    if resonator_params.phi_0 is not None and np.abs(resonator_params.phi_0) > 0.25:
+        if suppress_warnings:
+            warnings.warn(
+                "Extracted phi_0 greater than 0.25, this might indicate a big impedance mismatch, values of kappa_i and kappa_c might be affected, you can try to set: allow_mismatch=False",
+                UserWarning
+            )
     return fit_func, ResonatorParams(params, geometry)

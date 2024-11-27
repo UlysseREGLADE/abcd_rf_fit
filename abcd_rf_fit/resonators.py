@@ -173,7 +173,7 @@ class ResonatorParams(object):
         else:
             return None
 
-    def str(self, latex=False, separator=", ", precision=2, only_f_and_kappa=False, f_precision=2):
+    def str(self, latex=False, separator=", ", precision=2, only_f_and_kappa=False, f_precision=5):
 
         kappa = {False: "kappa/2pi", True: r"$\kappa/2\pi$"}
         kappa_i = {False: "kappa_i/2pi", True: r"$\kappa_i/2\pi$"}
