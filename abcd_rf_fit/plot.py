@@ -3,7 +3,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 from .utils import get_prefix, dB, deg
-from .resonators import resonator_dict
+# from .resonators import resonator_dict
 
 cm = 1/2.54  # centimeters in inches
 column_width = 12.4*cm
@@ -100,10 +100,12 @@ def plot(
     else:
         corrected_signal = None
     
-    y_axis_str = r'S_{11}'
-    if fit_params is not None:
-        if fit_params.resonator_func == resonator_dict['t']:
-            y_axis_str = r'S_{21}'
+    # y_axis_str = r'S_{11}'
+    # if fit_params is not None:
+    #     if fit_params.resonator_func == resonator_dict['t']:
+    #         y_axis_str = r'S_{21}'
+    
+    y_axis_str = r'S'
     
     if center_freq:
         freq = freq - fit_params.f_0
@@ -124,12 +126,12 @@ def plot(
     freq_disp, freq_prefix = get_prefix(freq)
     if params is not None:
         # params_label = params.str(latex=True, separator="\n", precision=precision, only_f_and_kappa=only_f_and_kappa)
-        params_label = params.str(latex=True, separator=", ", precision=precision, only_f_and_kappa=only_f_and_kappa)
+        params_label = params.str(latex=True, separator=", ", precision=precision, only_f_and_kappa=only_f_and_kappa, red_warning=True)
     else:
         params_label = None
     if fit_params is not None:
         # fit_params_label = fit_params.str(latex=True, separator="\n", precision=precision, only_f_and_kappa=only_f_and_kappa)
-        fit_params_label = fit_params.str(latex=True, separator=", ", precision=precision, only_f_and_kappa=only_f_and_kappa)
+        fit_params_label = fit_params.str(latex=True, separator=", ", precision=precision, only_f_and_kappa=only_f_and_kappa, red_warning=True)
     else:
         fit_params_label = None
 
