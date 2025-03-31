@@ -149,8 +149,10 @@ def fit_signal(
     final_ls_opti=True,
     allow_mismatch=True,
     rec_depth=1,
+    api_warning=True,
 ):
-    warnings.warn("fit_signal() is deprecated, please use analyze() instead, and analyze().plot() to display data.", UserWarning)
+    if api_warning:
+        warnings.warn("fit_signal() is deprecated, please use analyze() instead, and analyze().plot() to display data.", UserWarning)
 
     if fit_edelay:
         edelay = meta_fit_edelay(freq, signal, rec_depth)
@@ -204,4 +206,5 @@ def analyze(
         fit_edelay,
         final_ls_opti,
         allow_mismatch,
-        rec_depth)[1]
+        rec_depth,
+        api_warning = False)[1]
