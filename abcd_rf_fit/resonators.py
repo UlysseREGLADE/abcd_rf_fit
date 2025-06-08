@@ -734,7 +734,7 @@ class ResonatorParams:
         if self.f_0 is not None and self.kappa is not None and self.kappa != 0:
             return self.f_0 / self.kappa
         return None
-    
+
     @property
     def Q(self):
         """Total quality factor (alias for Q_total).
