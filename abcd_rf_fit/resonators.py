@@ -1,4 +1,109 @@
+from inspect import signature
 import numpy as np
+from .utils import (
+    guess_edelay_from_gradient,
+    smooth_gradient,
+    complex_fit,
+)
+
+from .resonators import *
+
+
+class FitResult(object):
+    """
+    Container for fit results including parameters, covariance matrix, and quality metrics
+    """
+
+    def __init__(self, params, geometry, pcov=None, fit_func=None):
+        self.resonator_params = ResonatorParams(params, geometry)
+        self.pcov = pcov
+        self.fit_func = fit_func
+
+    @property
+    def params(self):
+        """Access to the ResonatorParams object"""
+        return self.resonator_params
+
+    @property
+    def param_errors(self):
+        """Calculate parameter uncertainties from covariance matrix"""
+        if self.pcov is not None:
+            return np.sqrt(np.diag(self.pcov))
+        else:
+            return None
+
+    @property
+    def correlation_matrix(self):
+        """Calculate correlation matrix from covariance matrix"""
+        if self.pcov is not None:
+            std_devs = np.sqrt(np.diag(self.pcov))
+            correlation = self.pcov / np.outer(std_devs, std_devs)
+            return correlation
+        else:
+            return None
+
+    def get_param_error(self, param_name):
+        """Get uncertainty for a specific parameter"""
+        if self.param_errors is None:
+            return None
+
+        # Map parameter names to indices
+        param_map = {}
+        if hasattr(self.resonator_params, "f_0_index"):
+            param_map["f_0"] = self.resonator_params.f_0_index
+        if hasattr(self.resonator_params, "kappa_index"):
+            param_map["kappa"] = self.resonator_params.kappa_index
+        if hasattr(self.resonator_params, "kappa_c_real_index"):
+            param_map["kappa_c"] = self.resonator_params.kappa_c_real_index
+        if hasattr(self.resonator_params, "phi_0_index"):
+            param_map["phi_0"] = self.resonator_params.phi_0_index
+        if hasattr(self.resonator_params, "re_a_in_index"):
+            param_map["re_a_in"] = self.resonator_params.re_a_in_index
+        if hasattr(self.resonator_params, "im_a_in_index"):
+            param_map["im_a_in"] = self.resonator_params.im_a_in_index
+        if hasattr(self.resonator_params, "edelay_index"):
+            param_map["edelay"] = self.resonator_params.edelay_index
+
+        if param_name in param_map:
+            return self.param_errors[param_map[param_name]]
+        else:
+            return None
+
+    def goodness_of_fit(self, freq, signal):
+        """Calculate goodness of fit metrics"""
+        if self.fit_func is None:
+            return None
+
+        fitted_signal = self.fit_func(freq, *self.resonator_params.params)
+        residuals = signal - fitted_signal
+
+        # R-squared
+        ss_res = np.sum(np.abs(residuals) ** 2)
+        ss_tot = np.sum(np.abs(signal - np.mean(signal)) ** 2)
+        r_squared = 1 - (ss_res / ss_tot)
+
+        # Reduced chi-squared
+        n_params = len(self.resonator_params.params)
+        n_data = len(signal)
+        reduced_chi_sq = ss_res / (n_data - n_params)
+
+        return {
+            "r_squared": r_squared,
+            "reduced_chi_squared": reduced_chi_sq,
+            "rms_residual": np.sqrt(ss_res / n_data),
+        }
+
+    def __str__(self):
+        result = str(self.resonator_params)
+        if self.param_errors is not None:
+            result += "\nParameter uncertainties available (use .param_errors or .get_param_error())"
+        return result
+
+    def __repr__(self):
+        return self.__str__()
+
+
+
 
 if __name__ == "__main__":
 

@@ -215,8 +215,9 @@ def fit_signal(
 
     fit_func = get_fit_function(geometry, fit_amplitude, fit_edelay)
 
+    pcov = None
     if final_ls_opti:
-        params, _ = complex_fit(fit_func, freq, signal, params)
+        params, pcov = complex_fit(fit_func, freq, signal, params)
     
     resonator_params = ResonatorParams(params, geometry)
 
@@ -226,4 +227,7 @@ def fit_signal(
                 "Extracted phi_0 greater than 0.25, this might indicate a big impedance mismatch, values of kappa_i and kappa_c might be affected, you can try to set: allow_mismatch=False",
                 UserWarning
             )
-    return fit_func, ResonatorParams(params, geometry)
+    
+    # Return FitResult object with covariance matrix information
+    fit_result = FitResult(params, geometry, pcov, fit_func)
+    return fit_func, fit_result
