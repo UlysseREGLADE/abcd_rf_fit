@@ -734,7 +734,7 @@ class ResonatorParams:
         if self.f_0 is not None and self.kappa is not None and self.kappa != 0:
             return self.f_0 / self.kappa
         return None
-
+    
     @property
     def Q(self):
         """Total quality factor (alias for Q_total).
@@ -744,8 +744,9 @@ class ResonatorParams:
         float or None
             Total quality factor Q = f_0 / kappa.
         """
-        return self.Q_total @ property
+        return self.Q_total
 
+    @property
     def a_in(self):
         """Complex input amplitude parameter.
 
