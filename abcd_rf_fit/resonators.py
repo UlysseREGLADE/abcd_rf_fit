@@ -26,6 +26,10 @@ class FitResult:
         Resonator parameter values.
     geometry : str
         Resonator measurement geometry.
+    freq : np.ndarray, optional
+        Frequency array used in the fit.
+    signal : np.ndarray, optional
+        Signal array that was fitted.
     pcov : np.ndarray, optional
         Parameter covariance matrix from fitting.
     fit_func : callable, optional
@@ -35,6 +39,10 @@ class FitResult:
     ----------
     resonator_params : ResonatorParams
         Container for the resonator parameters.
+    freq : np.ndarray or None
+        Frequency array used in the fit.
+    signal : np.ndarray or None
+        Signal array that was fitted.
     pcov : np.ndarray or None
         Parameter covariance matrix.
     fit_func : callable or None
@@ -45,11 +53,15 @@ class FitResult:
         self,
         params: List[float],
         geometry: str,
+        freq: Optional[np.ndarray] = None,
+        signal: Optional[np.ndarray] = None,
         pcov: Optional[np.ndarray] = None,
         fit_func: Optional[callable] = None,
     ):
         """Initialize FitResult with parameters and optional covariance matrix."""
         self.resonator_params = ResonatorParams(params, geometry)
+        self.freq = freq
+        self.signal = signal
         self.pcov = pcov
         self.fit_func = fit_func
 
@@ -130,20 +142,11 @@ class FitResult:
             return self.param_errors[param_map[param_name]]
         return None
 
-    def goodness_of_fit(
-        self, freq: np.ndarray, signal: np.ndarray
-    ) -> Optional[Dict[str, float]]:
-        """Calculate goodness of fit metrics.
+    def goodness_of_fit(self) -> Optional[Dict[str, float]]:
+        """Calculate goodness of fit metrics using stored data.
 
         Computes various statistical measures to assess the quality of the fit,
         including R-squared, reduced chi-squared, and RMS residual.
-
-        Parameters
-        ----------
-        freq : np.ndarray
-            Frequency array used in the fit.
-        signal : np.ndarray
-            Original signal data that was fitted.
 
         Returns
         -------
@@ -152,22 +155,22 @@ class FitResult:
             - 'r_squared': Coefficient of determination (0-1, higher is better)
             - 'reduced_chi_squared': Reduced chi-squared statistic
             - 'rms_residual': Root mean square of residuals
-            Returns None if fit function is not available.
+            Returns None if fit function or data is not available.
         """
-        if self.fit_func is None:
+        if self.fit_func is None or self.freq is None or self.signal is None:
             return None
 
-        fitted_signal = self.fit_func(freq, *self.resonator_params.params)
-        residuals = signal - fitted_signal
+        fitted_signal = self.fit_func(self.freq, *self.resonator_params.params)
+        residuals = self.signal - fitted_signal
 
         # R-squared
         ss_res = np.sum(np.abs(residuals) ** 2)
-        ss_tot = np.sum(np.abs(signal - np.mean(signal)) ** 2)
+        ss_tot = np.sum(np.abs(self.signal - np.mean(self.signal)) ** 2)
         r_squared = 1 - (ss_res / ss_tot)
 
         # Reduced chi-squared
         n_params = len(self.resonator_params.params)
-        n_data = len(signal)
+        n_data = len(self.signal)
         reduced_chi_sq = ss_res / (n_data - n_params)
 
         return {
@@ -185,20 +188,15 @@ class FitResult:
     def __repr__(self):
         return self.__str__()
 
-    def validate_fit(
-        self, freq: np.ndarray, signal: np.ndarray, strict: bool = False
-    ) -> Dict[str, Any]:
+    def validate_fit(self, strict: bool = False) -> Dict[str, Any]:
         """Comprehensive fit validation with automatic warnings and recommendations.
 
         Performs extensive validation of the fit quality including parameter
-        bounds checking, uncertainty analysis, and goodness of fit assessment.
+        bounds checking, uncertainty analysis, and goodness of fit assessment
+        using the stored frequency and signal data.
 
         Parameters
         ----------
-        freq : np.ndarray
-            Frequency array used in the fit.
-        signal : np.ndarray
-            Signal array that was fitted.
         strict : bool, optional
             If True, apply stricter validation criteria. Default is False.
 
@@ -217,6 +215,13 @@ class FitResult:
             "recommendations": [],
             "metrics": {},
         }
+
+        # Check if we have data for validation
+        if self.freq is None or self.signal is None:
+            validation["warnings"].append("No frequency/signal data available for validation")
+            validation["recommendations"].append("Store freq and signal data during fit for comprehensive validation")
+            validation["status"] = "limited"
+            return validation
 
         # 1. Parameter uncertainty validation
         if self.param_errors is not None:
@@ -241,10 +246,8 @@ class FitResult:
                         )
                         validation["recommendations"].append(
                             f"Consider more data points or lower noise for better {param_name} determination"
-                        )
-
-        # 2. Goodness of fit validation
-        gof = self.goodness_of_fit(freq, signal)
+                        )        # 2. Goodness of fit validation
+        gof = self.goodness_of_fit()
         if gof is not None:
             validation["metrics"].update(gof)
 
@@ -289,13 +292,11 @@ class FitResult:
                         )
                         validation["recommendations"].append(
                             "High parameter correlation may indicate overparameterization"
-                        )
-
-        # 4. Physical parameter validation
+                        )        # 4. Physical parameter validation
         # Check if parameters are within reasonable ranges
         if self.resonator_params.f_0 is not None:
-            freq_range = freq[-1] - freq[0]
-            freq_center = (freq[-1] + freq[0]) / 2
+            freq_range = self.freq[-1] - self.freq[0]
+            freq_center = (self.freq[-1] + self.freq[0]) / 2
 
             # Resonance should be near the measurement range
             f_0_deviation = abs(self.resonator_params.f_0 - freq_center) / freq_range
@@ -307,8 +308,8 @@ class FitResult:
                     "Consider adjusting frequency range to center on resonance"
                 )
 
-        if self.resonator_params.kappa is not None and freq.size > 10:
-            freq_span = freq[-1] - freq[0]
+        if self.resonator_params.kappa is not None and self.freq.size > 10:
+            freq_span = self.freq[-1] - self.freq[0]
             # Linewidth should be reasonable compared to frequency span
             if self.resonator_params.kappa > freq_span:
                 validation["warnings"].append(
@@ -533,15 +534,14 @@ class FitResult:
             )
 
         return cls(params, geometry, pcov=pcov)
-
-    def compare_with(self, other_fit_result, freq, signal):
+    def compare_with(self, other_fit_result, freq: Optional[np.ndarray] = None, signal: Optional[np.ndarray] = None):
         """
         Compare this fit result with another fit result.
 
         Args:
             other_fit_result: Another FitResult object
-            freq: Frequency array for comparison
-            signal: Original signal for comparison
+            freq: Frequency array for comparison (optional, uses stored data if not provided)
+            signal: Original signal for comparison (optional, uses stored data if not provided)
 
         Returns
         -------
@@ -552,6 +552,10 @@ class FitResult:
             "quality_comparison": {},
             "recommendation": None,
         }
+
+        # Use provided data or fall back to stored data
+        freq_to_use = freq if freq is not None else self.freq
+        signal_to_use = signal if signal is not None else self.signal
 
         # Parameter comparison
         param_names = ["f_0", "kappa", "kappa_c", "edelay", "phi_0"]
@@ -590,40 +594,40 @@ class FitResult:
 
                 comparison["parameter_differences"][param_name] = param_comparison
 
-        # Quality comparison
-        gof1 = self.goodness_of_fit(freq, signal)
-        gof2 = other_fit_result.goodness_of_fit(freq, signal)
+        # Quality comparison (only if we have data available)
+        if freq_to_use is not None and signal_to_use is not None:
+            gof1 = self.goodness_of_fit()
+            gof2 = other_fit_result.goodness_of_fit()
 
-        if gof1 is not None and gof2 is not None:
-            comparison["quality_comparison"] = {
-                "r_squared_1": gof1["r_squared"],
-                "r_squared_2": gof2["r_squared"],
-                "r_squared_diff": gof1["r_squared"] - gof2["r_squared"],
-                "chi_squared_1": gof1["reduced_chi_squared"],
-                "chi_squared_2": gof2["reduced_chi_squared"],
-                "chi_squared_ratio": gof1["reduced_chi_squared"]
-                / gof2["reduced_chi_squared"],
-            }
+            if gof1 is not None and gof2 is not None:
+                comparison["quality_comparison"] = {
+                    "r_squared_1": gof1["r_squared"],
+                    "r_squared_2": gof2["r_squared"],
+                    "r_squared_diff": gof1["r_squared"] - gof2["r_squared"],
+                    "chi_squared_1": gof1["reduced_chi_squared"],
+                    "chi_squared_2": gof2["reduced_chi_squared"],
+                    "chi_squared_ratio": gof1["reduced_chi_squared"]
+                    / gof2["reduced_chi_squared"],
+                }
 
-            # Recommendation based on quality
-            if gof1["r_squared"] > gof2["r_squared"] + 0.01:  # 1% improvement
-                comparison["recommendation"] = "fit_1_better"
-            elif gof2["r_squared"] > gof1["r_squared"] + 0.01:
-                comparison["recommendation"] = "fit_2_better"
-            else:
-                comparison["recommendation"] = "equivalent_quality"
+                # Recommendation based on quality
+                if gof1["r_squared"] > gof2["r_squared"] + 0.01:  # 1% improvement
+                    comparison["recommendation"] = "fit_1_better"
+                elif gof2["r_squared"] > gof1["r_squared"] + 0.01:
+                    comparison["recommendation"] = "fit_2_better"
+                else:
+                    comparison["recommendation"] = "equivalent_quality"
 
         return comparison
-
-    def plot(self, freq: np.ndarray, signal: np.ndarray, **kwargs):
+    def plot(self, freq: Optional[np.ndarray] = None, signal: Optional[np.ndarray] = None, **kwargs):
         """Plot the fit results with original data.
 
         Parameters
         ----------
-        freq : np.ndarray
-            Frequency array used in the fit.
-        signal : np.ndarray
-            Original signal data that was fitted.
+        freq : np.ndarray, optional
+            Frequency array used in the fit. If not provided, uses stored data.
+        signal : np.ndarray, optional
+            Original signal data that was fitted. If not provided, uses stored data.
         **kwargs
             Additional arguments passed to the plot function.
 
@@ -635,19 +639,27 @@ class FitResult:
         Examples
         --------
         >>> result = analyze(freq, signal, "transmission")
-        >>> fig = result.plot(freq, signal)
+        >>> fig = result.plot()  # Uses stored data
+        >>> fig = result.plot(freq, signal)  # Uses provided data
         >>> fig.show()
         """
         if self.fit_func is None:
             raise ValueError("No fit function available for plotting")
 
+        # Use provided data or fall back to stored data
+        freq_to_use = freq if freq is not None else self.freq
+        signal_to_use = signal if signal is not None else self.signal
+
+        if freq_to_use is None or signal_to_use is None:
+            raise ValueError("No frequency/signal data available for plotting. Provide freq and signal arguments or ensure data was stored during fit.")
+
         # Calculate fitted signal
-        fitted_signal = self.fit_func(freq, *self.resonator_params.params)
+        fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
 
         # Call the plot function with the fit results
         return plot(
-            freq,
-            signal,
+            freq_to_use,
+            signal_to_use,
             fit=fitted_signal,
             params=self.resonator_params,
             fit_params=self.resonator_params,

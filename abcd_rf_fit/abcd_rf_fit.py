@@ -378,10 +378,8 @@ def _fit_signal_core(
                 "affected, you can try to set: allow_mismatch=False",
                 UserWarning,
                 stacklevel=2,
-            )
-
-    # Return FitResult object with covariance matrix information
-    fit_result = FitResult(params, geometry, pcov, fit_func)
+            )    # Return FitResult object with covariance matrix information
+    fit_result = FitResult(params, geometry, freq, signal, pcov, fit_func)
     return fit_result
 
 
