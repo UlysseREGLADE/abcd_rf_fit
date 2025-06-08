@@ -332,26 +332,139 @@ class FitResult:
         return validation
 
     def to_dict(self):
-        """Export fit results to dictionary for saving/serialization."""
-        result_dict = {
-            "fitted_params": self.resonator_params.params,
-            "geometry": None,  # We need to store geometry info
-            "param_errors": self.param_errors.tolist()
-            if self.param_errors is not None
-            else None,
-            "covariance_matrix": self.pcov.tolist() if self.pcov is not None else None,
-            "correlation_matrix": self.correlation_matrix.tolist()
-            if self.correlation_matrix is not None
-            else None,
-        }
-
-        # Try to determine geometry from resonator function
+        """Export fit results to dictionary for saving/serialization.
+        
+        Returns a comprehensive dictionary with named parameters, their values,
+        uncertainties, and all fit quality information.
+        """
+        # Get geometry string
+        geometry = None
         for geom, func in resonator_dict.items():
             if self.resonator_params.resonator_func == func:
-                result_dict["geometry"] = geom
+                geometry = geom
                 break
+          # Create structured parameter dictionary with names, values, and errors
+        parameters = {}
+        param_names = ['f_0', 'kappa', 'kappa_i', 'kappa_c', 'edelay', 'phi_0', 'Q', 'Q_i', 'Q_c']
+        
+        for param_name in param_names:
+            param_value = getattr(self.resonator_params, param_name, None)
+            if param_value is not None:
+                param_error = self.get_param_error(param_name)
+                
+                # Handle complex numbers for JSON serialization
+                if isinstance(param_value, complex):
+                    serializable_value = {
+                        'real': float(param_value.real),
+                        'imag': float(param_value.imag),
+                        '_type': 'complex'
+                    }
+                elif isinstance(param_value, np.ndarray):
+                    serializable_value = param_value.tolist()
+                elif isinstance(param_value, (np.integer, np.floating)):
+                    serializable_value = float(param_value)
+                else:
+                    serializable_value = param_value
+                
+                parameters[param_name] = {
+                    'value': serializable_value,
+                    'error': float(param_error) if param_error is not None else None,
+                    'relative_error': float(abs(param_error / param_value)) if param_error is not None and param_value != 0 else None
+                }
+        
+        # Build comprehensive result dictionary
+        result_dict = {
+            # High-level summary
+            'geometry': geometry,
+            'fit_summary': self._get_fit_summary(),
+            
+            # Structured parameters with names, values, and uncertainties
+            'parameters': parameters,
+              # Raw arrays for compatibility
+            'raw_data': {
+                'fitted_params': [float(x) if not isinstance(x, complex) else {'real': float(x.real), 'imag': float(x.imag), '_type': 'complex'} for x in self.resonator_params.params],
+                'param_errors': [float(x) for x in self.param_errors.tolist()] if self.param_errors is not None else None,
+                'covariance_matrix': [[float(x) for x in row] for row in self.pcov.tolist()] if self.pcov is not None else None,
+                'correlation_matrix': [[float(x) for x in row] for row in self.correlation_matrix.tolist()] if self.correlation_matrix is not None else None,
+            },
+            
+            # Metadata
+            'metadata': {
+                'parameter_count': len(self.resonator_params.params),
+                'has_uncertainties': self.param_errors is not None,
+                'has_covariance': self.pcov is not None,
+            }
+        }
 
         return result_dict
+
+    def _get_fit_summary(self):
+        """Generate a human-readable summary of the fit results."""
+        summary = {
+            'geometry': None,
+            'resonance_frequency': None,
+            'quality_factor': None,
+            'linewidth': None,
+            'coupling_rates': {},
+        }
+        
+        # Get geometry name
+        for geom, func in resonator_dict.items():
+            if self.resonator_params.resonator_func == func:
+                summary['geometry'] = geom
+                break
+        
+        # Add main parameters with proper units and formatting
+        if self.resonator_params.f_0 is not None:
+            f0_error = self.get_param_error('f_0')
+            summary['resonance_frequency'] = {
+                'value_hz': self.resonator_params.f_0,
+                'error_hz': f0_error,
+                'formatted': f"{get_prefix_str(self.resonator_params.f_0, 5)}Hz"
+            }
+        
+        if self.resonator_params.Q is not None:
+            summary['quality_factor'] = {
+                'total_q': self.resonator_params.Q,
+                'q_internal': self.resonator_params.Q_i,
+                'q_coupling': self.resonator_params.Q_c,
+            }
+        
+        if self.resonator_params.kappa is not None:
+            kappa_error = self.get_param_error('kappa')
+            summary['linewidth'] = {
+                'value_hz': self.resonator_params.kappa,
+                'error_hz': kappa_error,
+                'formatted': f"{get_prefix_str(self.resonator_params.kappa, 3)}Hz"
+            }
+        
+        if self.resonator_params.kappa_i is not None:
+            summary['coupling_rates']['internal'] = {
+                'value_hz': self.resonator_params.kappa_i,
+                'formatted': f"{get_prefix_str(self.resonator_params.kappa_i, 3)}Hz"
+            }
+        
+        if self.resonator_params.kappa_c is not None:
+            summary['coupling_rates']['external'] = {
+                'value_hz': self.resonator_params.kappa_c,
+                'formatted': f"{get_prefix_str(self.resonator_params.kappa_c, 3)}Hz"
+            }
+        
+        if self.resonator_params.phi_0 is not None:
+            summary['phase_offset'] = {
+                'value_rad': self.resonator_params.phi_0,
+                'value_deg': self.resonator_params.phi_0 * 180 / np.pi,
+                'error_rad': self.get_param_error('phi_0'),
+            }
+        
+        if self.resonator_params.edelay is not None:
+            summary['electrical_delay'] = {
+                'value_s': self.resonator_params.edelay,
+                'error_s': self.get_param_error('edelay'),
+                'formatted': f"{get_prefix_str(self.resonator_params.edelay, 3)}s"
+            }
+        
+        return summary
 
     def save_to_file(self, filename):
         """Save fit results to JSON file."""
