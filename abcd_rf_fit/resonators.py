@@ -102,8 +102,289 @@ class FitResult(object):
     def __repr__(self):
         return self.__str__()
 
+    def validate_fit(self, freq, signal, strict=False):
+        """
+        Comprehensive fit validation with automatic warnings and recommendations
 
+        Args:
+            freq: Frequency array
+            signal: Signal array
+            strict: If True, apply stricter validation criteria
 
+        Returns:
+            dict: Validation results with status, warnings, and recommendations
+        """
+        validation = {
+            'status': 'good',
+            'warnings': [],
+            'recommendations': [],
+            'metrics': {}
+        }
+
+        # 1. Parameter uncertainty validation
+        if self.param_errors is not None:
+            # Check if any parameter has very large uncertainty
+            rel_errors = []
+            param_names = ['f_0', 'kappa_c', 'edelay']
+
+            for param_name in param_names:
+                param_val = getattr(self.resonator_params, param_name, None)
+                param_err = self.get_param_error(param_name)
+
+                if param_val is not None and param_err is not None and param_val != 0:
+                    rel_error = abs(param_err / param_val)
+                    rel_errors.append((param_name, rel_error))
+                    validation['metrics'][f'{param_name}_relative_error'] = rel_error
+
+                    # Flag parameters with high uncertainty
+                    threshold = 0.1 if strict else 0.2  # 10% or 20% relative error
+                    if rel_error > threshold:
+                        validation['warnings'].append(
+                            f"{param_name} has high uncertainty ({rel_error*100:.1f}%)"
+                        )
+                        validation['recommendations'].append(
+                            f"Consider more data points or lower noise for better {param_name} determination"
+                        )
+
+        # 2. Goodness of fit validation
+        gof = self.goodness_of_fit(freq, signal)
+        if gof is not None:
+            validation['metrics'].update(gof)
+
+            # R-squared validation
+            r2_threshold = 0.95 if strict else 0.9
+            if gof['r_squared'] < r2_threshold:
+                validation['warnings'].append(
+                    f"Low R² = {gof['r_squared']:.3f} (< {r2_threshold})"
+                )
+                validation['recommendations'].append(
+                    "Consider different geometry or check for systematic errors"
+                )
+
+            # Reduced chi-squared validation
+            if gof['reduced_chi_squared'] > 5:
+                validation['warnings'].append(
+                    f"High χ²_red = {gof['reduced_chi_squared']:.2f} (>> 1)"
+                )
+                validation['recommendations'].append(
+                    "Systematic residuals detected - model may be inadequate"
+                )
+            elif gof['reduced_chi_squared'] < 0.1:
+                validation['warnings'].append(
+                    f"Very low χ²_red = {gof['reduced_chi_squared']:.2f} (<< 1)"
+                )
+                validation['recommendations'].append(
+                    "Possible overfitting or underestimated noise"
+                )
+
+        # 3. Parameter correlation validation
+        corr_matrix = self.correlation_matrix
+        if corr_matrix is not None:
+            # Find highly correlated parameters
+            n_params = corr_matrix.shape[0]
+            high_corr_threshold = 0.95 if strict else 0.99
+
+            for i in range(n_params):
+                for j in range(i + 1, n_params):
+                    if abs(corr_matrix[i, j]) > high_corr_threshold:
+                        validation['warnings'].append(
+                            f"Parameters {i} and {j} are highly correlated ({corr_matrix[i, j]:.3f})"
+                        )
+                        validation['recommendations'].append(
+                            "High parameter correlation may indicate overparameterization"
+                        )
+
+        # 4. Physical parameter validation
+        # Check if parameters are within reasonable ranges
+        if self.resonator_params.f_0 is not None:
+            freq_range = freq[-1] - freq[0]
+            freq_center = (freq[-1] + freq[0]) / 2
+
+            # Resonance should be near the measurement range
+            f_0_deviation = abs(self.resonator_params.f_0 - freq_center) / freq_range
+            if f_0_deviation > 0.6:  # Resonance more than 60% away from center
+                validation['warnings'].append(
+                    f"Resonance frequency far from measurement center ({f_0_deviation*100:.1f}% of span)"
+                )
+                validation['recommendations'].append(
+                    "Consider adjusting frequency range to center on resonance"
+                )
+
+        if self.resonator_params.kappa is not None and freq.size > 10:
+            freq_span = freq[-1] - freq[0]
+            # Linewidth should be reasonable compared to frequency span
+            if self.resonator_params.kappa > freq_span:
+                validation['warnings'].append(
+                    "Linewidth larger than frequency span - may be over-broadened"
+                )
+            elif self.resonator_params.kappa < freq_span / 1000:
+                validation['warnings'].append(
+                    "Linewidth much smaller than frequency span - may need higher resolution"
+                )
+
+        # Set overall status
+        if len(validation['warnings']) == 0:
+            validation['status'] = 'excellent'
+        elif len(validation['warnings']) <= 2:
+            validation['status'] = 'good'
+        elif len(validation['warnings']) <= 4:
+            validation['status'] = 'acceptable'
+        else:
+            validation['status'] = 'poor'
+
+        return validation
+
+    def to_dict(self):
+        """Export fit results to dictionary for saving/serialization"""
+        result_dict = {
+            'fitted_params': self.resonator_params.params,
+            'geometry': None,  # We need to store geometry info
+            'param_errors': self.param_errors.tolist() if self.param_errors is not None else None,
+            'covariance_matrix': self.pcov.tolist() if self.pcov is not None else None,
+            'correlation_matrix': self.correlation_matrix.tolist() if self.correlation_matrix is not None else None,
+        }
+        
+        # Try to determine geometry from resonator function
+        for geom, func in resonator_dict.items():
+            if self.resonator_params.resonator_func == func:
+                result_dict['geometry'] = geom
+                break
+                
+        return result_dict
+    
+    def save_to_file(self, filename):
+        """Save fit results to JSON file"""
+        import json
+        
+        result_dict = self.to_dict()
+        
+        # Convert numpy arrays to lists for JSON serialization
+        def convert_numpy(obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, (np.integer, np.floating)):
+                return float(obj)
+            elif isinstance(obj, np.complexfloating):
+                return {'real': float(obj.real), 'imag': float(obj.imag)}
+            return obj
+        
+        # Apply conversion recursively
+        def deep_convert(obj):
+            if isinstance(obj, dict):
+                return {k: deep_convert(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [deep_convert(v) for v in obj]
+            else:
+                return convert_numpy(obj)
+        
+        result_dict = deep_convert(result_dict)
+        
+        with open(filename, 'w') as f:
+            json.dump(result_dict, f, indent=2)
+            
+    @classmethod
+    def load_from_file(cls, filename):
+        """Load fit results from JSON file"""
+        import json
+        
+        with open(filename, 'r') as f:
+            result_dict = json.load(f)
+        
+        # Reconstruct complex numbers
+        def reconstruct_complex(obj):
+            if isinstance(obj, dict):
+                if 'real' in obj and 'imag' in obj:
+                    return complex(obj['real'], obj['imag'])
+                else:
+                    return {k: reconstruct_complex(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [reconstruct_complex(v) for v in obj]
+            return obj
+        
+        result_dict = reconstruct_complex(result_dict)
+        
+        # Create FitResult object
+        params = result_dict['fitted_params']
+        geometry = result_dict['geometry']
+        pcov = np.array(result_dict['covariance_matrix']) if result_dict['covariance_matrix'] else None
+        
+        fit_result = cls(params, geometry, pcov=pcov)
+        return fit_result
+
+    def compare_with(self, other_fit_result, freq, signal):
+        """
+        Compare this fit result with another fit result
+        
+        Args:
+            other_fit_result: Another FitResult object
+            freq: Frequency array for comparison
+            signal: Original signal for comparison
+            
+        Returns:
+            dict: Comparison results
+        """
+        comparison = {
+            'parameter_differences': {},
+            'quality_comparison': {},
+            'recommendation': None
+        }
+        
+        # Parameter comparison
+        param_names = ['f_0', 'kappa', 'kappa_c', 'edelay', 'phi_0']
+        
+        for param_name in param_names:
+            val1 = getattr(self.resonator_params, param_name, None)
+            val2 = getattr(other_fit_result.resonator_params, param_name, None)
+            
+            if val1 is not None and val2 is not None:
+                diff = abs(val1 - val2)
+                rel_diff = diff / abs(val1) if val1 != 0 else float('inf')
+                
+                # Get uncertainties if available
+                err1 = self.get_param_error(param_name)
+                err2 = other_fit_result.get_param_error(param_name)
+                
+                param_comparison = {
+                    'absolute_difference': diff,
+                    'relative_difference': rel_diff,
+                    'value_1': val1,
+                    'value_2': val2,
+                    'error_1': err1,
+                    'error_2': err2
+                }
+                
+                # Statistical significance test
+                if err1 is not None and err2 is not None:
+                    combined_error = np.sqrt(err1**2 + err2**2)
+                    significance = diff / combined_error if combined_error > 0 else float('inf')
+                    param_comparison['statistical_significance'] = significance
+                    param_comparison['statistically_different'] = significance > 2  # 2-sigma test
+                
+                comparison['parameter_differences'][param_name] = param_comparison
+        
+        # Quality comparison
+        gof1 = self.goodness_of_fit(freq, signal)
+        gof2 = other_fit_result.goodness_of_fit(freq, signal)
+        
+        if gof1 is not None and gof2 is not None:
+            comparison['quality_comparison'] = {
+                'r_squared_1': gof1['r_squared'],
+                'r_squared_2': gof2['r_squared'],
+                'r_squared_diff': gof1['r_squared'] - gof2['r_squared'],
+                'chi_squared_1': gof1['reduced_chi_squared'],
+                'chi_squared_2': gof2['reduced_chi_squared'],
+                'chi_squared_ratio': gof1['reduced_chi_squared'] / gof2['reduced_chi_squared']
+            }
+            
+            # Recommendation based on quality
+            if gof1['r_squared'] > gof2['r_squared'] + 0.01:  # 1% improvement
+                comparison['recommendation'] = 'fit_1_better'
+            elif gof2['r_squared'] > gof1['r_squared'] + 0.01:
+                comparison['recommendation'] = 'fit_2_better'
+            else:
+                comparison['recommendation'] = 'equivalent_quality'
+        
+        return comparison
 
 if __name__ == "__main__":
 
