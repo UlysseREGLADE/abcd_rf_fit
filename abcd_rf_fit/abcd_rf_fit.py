@@ -337,6 +337,7 @@ def fit_signal(
     final_ls_opti: bool = True,
     allow_mismatch: bool = True,
     rec_depth: int = 1,
+    api_warning = True,
     suppress_warnings: bool = False,
 ) -> Tuple[callable, FitResult]:
     """Fit resonator S-parameter data to extract physical parameters.
@@ -395,6 +396,9 @@ def fit_signal(
     >>> print(f"Q = {result.f_0/result.kappa:.1f}")
     >>> result.validate_fit()  # Check fit quality
     """
+    if api_warning:
+        warnings.warn("fit_signal() is deprecated, please use analyze() instead, and analyze().plot() to display data.", UserWarning)
+    
     edelay = meta_fit_edelay(freq, signal, rec_depth) if fit_edelay else 0
 
     if resonator_dict[geometry] == reflection and allow_mismatch:
@@ -420,7 +424,7 @@ def fit_signal(
     if final_ls_opti:
         params, pcov = complex_fit(fit_func, freq, signal, params)
 
-    resonator_params = ResonatorParams(params, geometry)
+    resonator_params = ResonatorParams(params, geometry, freq, signal)
 
     if resonator_params.phi_0 is not None and np.abs(resonator_params.phi_0) > 0.25:
         if not suppress_warnings:

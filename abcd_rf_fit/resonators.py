@@ -490,6 +490,8 @@ class FitResult:
 
         return comparison
 
+from copy import deepcopy
+from .plot import plot
 
 if __name__ == "__main__":
     from utils import (
@@ -532,7 +534,6 @@ def hanger(freq, f_0, kappa, kappa_c_real, phi_0=0):
 def hanger_mismatched(freq, f_0, kappa, kappa_c_real, phi_0):
     return hanger(freq, f_0, kappa, kappa_c_real, phi_0)
 
-
 resonator_dict = {
     "transmission": transmission,
     "t": transmission,
@@ -546,6 +547,40 @@ resonator_dict = {
     "hm": hanger_mismatched,
 }
 
+def get_fit_function(geometry, amplitude=True, edelay=True):
+    if type(geometry) == str:
+        resonator_func = resonator_dict[geometry]
+    else:
+        resonator_func = geometry
+
+    if not amplitude and not edelay:
+        return resonator_func
+
+    elif amplitude and not edelay:
+        def fit_func(*args):
+            return resonator_func(*args[:-2]) * (args[-2] + 1j * args[-1])
+
+        return fit_func
+
+    elif not amplitude and edelay:
+        def fit_func(*args):
+            return resonator_func(*args[:-1]) * np.exp(2j * np.pi * args[-1] * args[0])
+
+        return fit_func
+
+    elif amplitude and edelay:
+        def fit_func(*args):
+            return (
+                resonator_func(*args[:-3])
+                * (args[-3] + 1j * args[-2])
+                * np.exp(2j * np.pi * args[-1] * args[0])
+            )
+
+        return fit_func
+
+    else:
+
+        raise Exception("Unreachable")
 
 class ResonatorParams:
     """Container for resonator parameters with geometry-specific access methods.
@@ -589,9 +624,12 @@ class ResonatorParams:
         Index of electrical delay parameter.
     """
 
-    def __init__(self, params: List[float], geometry: str):
+    def __init__(self, params: List[float], geometry: str, freq = None, signal = None):
         self.resonator_func = resonator_dict[geometry]
         self.params = params
+
+        self.freq = freq
+        self.signal = signal
 
         if self.resonator_func == transmission:
             self.f_0_index = 0
@@ -822,6 +860,7 @@ class ResonatorParams:
         precision=2,
         only_f_and_kappa=False,
         f_precision=5,
+        red_warning = False
     ):
         """Generate formatted string representation of resonator parameters.
 
@@ -846,8 +885,8 @@ class ResonatorParams:
         kappa = {False: "kappa/2pi", True: r"$\kappa/2\pi$"}
         kappa_i = {False: "kappa_i/2pi", True: r"$\kappa_i/2\pi$"}
         kappa_c = {False: "kappa_c/2pi", True: r"$\kappa_c/2\pi$"}
-        phi_0 = {False: "phi_0", True: r"$\varphi_0$"}
         f_0 = {False: "f_0", True: r"$f_0$"}
+        phi_0 = {False: "phi_0", True: r"$\varphi_0$"}
 
         if self.edelay is not None:
             edelay_str = (
@@ -862,7 +901,11 @@ class ResonatorParams:
             kappa_str = rf"{separator}{kappa_i[latex]} = {get_prefix_str(self.kappa_i, precision)}Hz{separator}{kappa_c[latex]} = {get_prefix_str(self.kappa_c, precision)}Hz"
 
         if self.resonator_func in [hanger_mismatched, reflection_mismatched]:
-            phi_0_str = rf"{separator}{phi_0[latex]} = {self.phi_0:0.2f} rad"
+            if red_warning and self.phi_0 is not None and np.abs(self.phi_0) > 0.25:
+                phi_0_str = r"%s = %0.2f rad" % (phi_0[latex], self.phi_0)
+                phi_0_str = "%s/!\\ "%separator + phi_0_str + " /!\\"
+            else:
+                phi_0_str = rf"{separator}{phi_0[latex]} = {self.phi_0:0.2f} rad"
         else:
             phi_0_str = ""
 
@@ -874,7 +917,6 @@ class ResonatorParams:
 
     def __str__(self) -> str:
         """Return string representation of resonator parameters.
-
         Returns
         -------
         str
@@ -884,13 +926,65 @@ class ResonatorParams:
 
     def __repr__(self):
         """Return unambiguous string representation of resonator parameters.
-
         Returns
         -------
         str
             String representation for debugging and logging.
         """
         return self.str()
+
+    def __call__(self, freq, *args, **kwargs):
+        amplitude = self.a_in is not None
+        edelay = self.edelay is not None
+
+        fit_func = get_fit_function(self.resonator_func, amplitude, edelay)
+
+        if len(args) == 0 and len(kwargs) == 0:
+            params = self.params
+        else:
+            if len(kwargs) == 0:
+                params = np.copy(self.params)
+                params[:len(args)] = args
+            else:
+                resonator = deepcopy(self)
+                for key in kwargs:
+                    resonator.params[resonator.__dict__[key + "_index"]] = kwargs[key]
+                resonator.params[:len(args)] = args
+                params = resonator.params
+        
+        return fit_func(freq, *params)
+    
+    def plot(
+            self,
+            fig = None,
+            plot_not_corrected = True,
+            font_size = None,
+            plot_circle = True,
+            center_freq = False,
+            only_f_and_kappa = False,
+            precision = 2,
+            alpha_fit = 1.0,
+            style = 'Normal',
+            title = None,
+            params = None,
+        ):
+        plot(
+            self.freq,
+            self.signal,
+            self(self.freq),
+            fig=fig,
+            fit_params=self,
+            params=params,
+            plot_not_corrected=plot_not_corrected,
+            font_size=font_size,
+            plot_circle=plot_circle,
+            center_freq=center_freq,
+            only_f_and_kappa=only_f_and_kappa,
+            precision=precision,
+            alpha_fit=alpha_fit,
+            style=style,
+            title=title
+        )
 
 
 if __name__ == "__main__":
