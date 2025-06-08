@@ -490,6 +490,45 @@ class FitResult:
 
         return comparison
 
+    def plot(self, freq: np.ndarray, signal: np.ndarray, **kwargs):
+        """Plot the fit results with original data.
+
+        Parameters
+        ----------
+        freq : np.ndarray
+            Frequency array used in the fit.
+        signal : np.ndarray
+            Original signal data that was fitted.
+        **kwargs
+            Additional arguments passed to the plot function.
+
+        Returns
+        -------
+        matplotlib.figure.Figure
+            The created figure object.
+
+        Examples
+        --------
+        >>> result = analyze(freq, signal, "transmission")
+        >>> fig = result.plot(freq, signal)
+        >>> fig.show()
+        """
+        if self.fit_func is None:
+            raise ValueError("No fit function available for plotting")
+
+        # Calculate fitted signal
+        fitted_signal = self.fit_func(freq, *self.resonator_params.params)
+
+        # Call the plot function with the fit results
+        return plot(
+            freq,
+            signal,
+            fit=fitted_signal,
+            params=self.resonator_params,
+            fit_params=self.resonator_params,
+            **kwargs
+        )
+
 from copy import deepcopy
 from .plot import plot
 

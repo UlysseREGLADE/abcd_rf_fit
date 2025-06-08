@@ -128,7 +128,7 @@ def plot(
             separator="\n",
             precision=precision,
             only_f_and_kappa=only_f_and_kappa,
-            red_Warning=True,
+            red_warning=True,
         )
     else:
         params_label = None

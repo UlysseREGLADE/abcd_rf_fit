@@ -328,7 +328,7 @@ def meta_fit_edelay(freq: np.ndarray, signal: np.ndarray, rec_depth: int = 0) ->
     return edelay_array[np.argmin(l2_error_array)]
 
 
-def fit_signal(
+def _fit_signal_core(
     freq: np.ndarray,
     signal: np.ndarray,
     geometry: str,
@@ -337,68 +337,12 @@ def fit_signal(
     final_ls_opti: bool = True,
     allow_mismatch: bool = True,
     rec_depth: int = 1,
-    api_warning = True,
     suppress_warnings: bool = False,
-) -> Tuple[callable, FitResult]:
-    """Fit resonator S-parameter data to extract physical parameters.
-
-    This is the main fitting function that combines ABCD rational function fitting
-    with nonlinear optimization to extract resonator parameters. Returns both
-    the fitted function and a FitResult object containing parameter uncertainties
-    and quality metrics.
-
-    Parameters
-    ----------
-    freq : np.ndarray
-        Frequency array in Hz.
-    signal : np.ndarray
-        Complex S-parameter data to fit.
-    geometry : str
-        Resonator measurement geometry:
-        - "r", "reflection": Reflection measurement (S₁₁)
-        - "rm", "reflection_mismatched": Reflection with mismatch
-        - "t", "transmission": Transmission measurement (S₂₁)
-        - "h", "hanger": Hanger coupling measurement
-        - "hm", "hanger_mismatched": Hanger with mismatch
-    fit_amplitude : bool, optional
-        If True, fit complex amplitude scaling (default: True).
-    fit_edelay : bool, optional
-        If True, estimate and fit electrical delay (default: True).
-    final_ls_opti : bool, optional
-        If True, perform final nonlinear optimization (default: True).
-    allow_mismatch : bool, optional
-        If True, automatically use mismatched models when appropriate (default: True).
-    rec_depth : int, optional
-        ABCD algorithm recursion depth, 0-2 recommended (default: 1).
-    suppress_warnings : bool, optional
-        If True, suppress impedance mismatch warnings (default: False).
-
-    Returns
-    -------
-    tuple[callable, FitResult]        A tuple containing:
-        - fit_function: Callable that evaluates the fitted model
-        - fit_result: FitResult object with parameters, uncertainties,
-          and quality metrics
-
-    Notes
-    -----
-    The FitResult object provides access to:
-    - Parameter values and uncertainties (if final_ls_opti=True)
-    - Goodness of fit metrics (R², reduced χ², RMS residual)
-    - Fit validation with warnings and recommendations
-    - Parameter correlation matrix
-    - Save/load functionality for analysis results
-
-    Examples
-    --------
-    >>> fit_func, result = fit_signal(freq, s21_data, "transmission")
-    >>> print(f"f₀ = {result.f_0:.6e} ± {result.get_param_error('f_0'):.2e} Hz")
-    >>> print(f"Q = {result.f_0/result.kappa:.1f}")
-    >>> result.validate_fit()  # Check fit quality
-    """
-    if api_warning:
-        warnings.warn("fit_signal() is deprecated, please use analyze() instead, and analyze().plot() to display data.", UserWarning)
+) -> FitResult:
+    """Core fitting implementation without API redundancy.
     
+    This is the internal implementation that returns only a FitResult object.
+    """
     edelay = meta_fit_edelay(freq, signal, rec_depth) if fit_edelay else 0
 
     if resonator_dict[geometry] == reflection and allow_mismatch:
@@ -438,24 +382,182 @@ def fit_signal(
 
     # Return FitResult object with covariance matrix information
     fit_result = FitResult(params, geometry, pcov, fit_func)
-    return fit_func, fit_result
+    return fit_result
+
+
+def fit_signal(
+    freq: np.ndarray,
+    signal: np.ndarray,
+    geometry: str,
+    fit_amplitude: bool = True,
+    fit_edelay: bool = True,
+    final_ls_opti: bool = True,
+    allow_mismatch: bool = True,
+    rec_depth: int = 1,
+    api_warning: bool = True,
+    suppress_warnings: bool = False,
+) -> Tuple[callable, FitResult]:
+    """Fit resonator S-parameter data to extract physical parameters.
+
+    **DEPRECATED**: This function returns a redundant tuple (fit_func, FitResult)
+    where FitResult.fit_func already contains the same function. 
+    Use analyze() instead for a cleaner API.
+
+    Parameters
+    ----------
+    freq : np.ndarray
+        Frequency array in Hz.
+    signal : np.ndarray
+        Complex S-parameter data to fit.
+    geometry : str
+        Resonator measurement geometry:
+        - "r", "reflection": Reflection measurement (S₁₁)
+        - "rm", "reflection_mismatched": Reflection with mismatch
+        - "t", "transmission": Transmission measurement (S₂₁)
+        - "h", "hanger": Hanger coupling measurement
+        - "hm", "hanger_mismatched": Hanger with mismatch
+    fit_amplitude : bool, optional
+        If True, fit complex amplitude scaling (default: True).
+    fit_edelay : bool, optional
+        If True, estimate and fit electrical delay (default: True).
+    final_ls_opti : bool, optional
+        If True, perform final nonlinear optimization (default: True).
+    allow_mismatch : bool, optional
+        If True, automatically use mismatched models when appropriate (default: True).
+    rec_depth : int, optional
+        ABCD algorithm recursion depth, 0-2 recommended (default: 1).
+    api_warning : bool, optional
+        If True, show deprecation warning (default: True).
+    suppress_warnings : bool, optional
+        If True, suppress impedance mismatch warnings (default: False).
+
+    Returns
+    -------
+    tuple[callable, FitResult]
+        A tuple containing:
+        - fit_function: Callable that evaluates the fitted model
+        - fit_result: FitResult object with parameters, uncertainties,
+          and quality metrics
+        
+        NOTE: This is redundant since fit_result.fit_func contains the same function.
+
+    Notes
+    -----
+    **DEPRECATED**: Use analyze() instead which returns only FitResult.
+    The FitResult object provides access to:
+    - Parameter values and uncertainties (if final_ls_opti=True)
+    - Goodness of fit metrics (R², reduced χ², RMS residual)
+    - Fit validation with warnings and recommendations
+    - Parameter correlation matrix
+    - Save/load functionality for analysis results
+
+    Examples
+    --------
+    >>> # OLD (deprecated):
+    >>> fit_func, result = fit_signal(freq, s21_data, "transmission")
+    >>> 
+    >>> # NEW (recommended):
+    >>> result = analyze(freq, s21_data, "transmission")
+    >>> fit_func = result.fit_func  # Same function available as attribute
+    """
+    if api_warning:
+        warnings.warn(
+            "fit_signal() is deprecated due to API redundancy. Use analyze() instead. "
+            "fit_signal() returns (fit_func, FitResult) but FitResult.fit_func already "
+            "contains the same function.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+    
+    fit_result = _fit_signal_core(
+        freq, signal, geometry, fit_amplitude, fit_edelay, 
+        final_ls_opti, allow_mismatch, rec_depth, suppress_warnings
+    )
+    
+    return fit_result.fit_func, fit_result
 
 def analyze(
-    freq,
-    signal,
-    geometry,
-    fit_amplitude=True,
-    fit_edelay=True,
-    final_ls_opti=True,
-    allow_mismatch=True,
-    rec_depth=1,
-):
-    return fit_signal(
-        freq,
-        signal,
-        geometry,
-        fit_amplitude,
-        fit_edelay,
-        final_ls_opti,
-        allow_mismatch,
-        rec_depth)[1]
+    freq: np.ndarray,
+    signal: np.ndarray,
+    geometry: str,
+    fit_amplitude: bool = True,
+    fit_edelay: bool = True,
+    final_ls_opti: bool = True,
+    allow_mismatch: bool = True,
+    rec_depth: int = 1,
+) -> FitResult:
+    """Analyze resonator S-parameter data to extract physical parameters.
+
+    This is the recommended function for resonator parameter extraction. It returns
+    a comprehensive FitResult object containing fitted parameters, uncertainties,
+    and quality assessment tools.
+
+    Parameters
+    ----------
+    freq : np.ndarray
+        Frequency array in Hz.
+    signal : np.ndarray
+        Complex S-parameter data to fit.
+    geometry : str
+        Resonator measurement geometry:
+        - "r", "reflection": Reflection measurement (S₁₁)
+        - "rm", "reflection_mismatched": Reflection with mismatch
+        - "t", "transmission": Transmission measurement (S₂₁)
+        - "h", "hanger": Hanger coupling measurement
+        - "hm", "hanger_mismatched": Hanger with mismatch
+    fit_amplitude : bool, optional
+        If True, fit complex amplitude scaling (default: True).
+    fit_edelay : bool, optional
+        If True, estimate and fit electrical delay (default: True).
+    final_ls_opti : bool, optional
+        If True, perform final nonlinear optimization (default: True).
+    allow_mismatch : bool, optional
+        If True, automatically use mismatched models when appropriate (default: True).
+    rec_depth : int, optional
+        ABCD algorithm recursion depth, 0-2 recommended (default: 1).
+
+    Returns
+    -------
+    FitResult
+        Comprehensive fit result object containing:
+        - Fitted parameters with uncertainty estimates
+        - Goodness of fit metrics (R², reduced χ², RMS residual)
+        - Parameter correlation matrix
+        - Fit validation with warnings and recommendations
+        - Save/load functionality for analysis results
+        - Direct access to fit function via .fit_func attribute
+
+    Examples
+    --------
+    >>> # Basic fitting
+    >>> result = analyze(freq, s21_data, "transmission")
+    >>> print(f"f₀ = {result.f_0:.6e} Hz")
+    >>> print(f"Q = {result.f_0/result.kappa:.1f}")
+    >>> 
+    >>> # Access uncertainties
+    >>> f0_error = result.get_param_error('f_0')
+    >>> print(f"f₀ = {result.f_0:.6e} ± {f0_error:.2e} Hz")
+    >>> 
+    >>> # Evaluate fit function
+    >>> fitted_signal = result.fit_func(freq, *result.params.params)
+    >>> 
+    >>> # Validate fit quality
+    >>> validation = result.validate_fit(freq, s21_data)
+    >>> print(f"Fit status: {validation['status']}")
+    >>> 
+    >>> # Save results
+    >>> result.save_to_file('my_fit_results.json')
+
+    Notes
+    -----
+    This function provides a clean API without redundancy. The fitted function
+    is available as result.fit_func, eliminating the need to return it separately
+    as in the deprecated fit_signal() function.
+
+    For plotting results, use the .plot() method:
+    >>> result.plot(freq, signal)
+    """
+    return _fit_signal_core(
+        freq, signal, geometry, fit_amplitude, fit_edelay,
+        final_ls_opti, allow_mismatch, rec_depth, suppress_warnings=False
+    )
