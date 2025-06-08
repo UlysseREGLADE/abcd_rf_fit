@@ -10,7 +10,6 @@ from .utils import (
 
 from .resonators import *
 
-
 def get_abcd(freq, signal, rec_depth=0):
 
     freq_center = np.mean(freq)
@@ -120,44 +119,6 @@ def abcd2params(abcd, geometry):
         return f_0, kappa, kappa_c_real, phi_0, np.real(a_in), np.imag(a_in)
 
 
-def get_fit_function(geometry, amplitude=True, edelay=True):
-
-    resonator_func = resonator_dict[geometry]
-
-    if not amplitude and not edelay:
-
-        return resonator_func
-
-    elif amplitude and not edelay:
-
-        def fit_func(*args):
-            return resonator_func(*args[:-2]) * (args[-2] + 1j * args[-1])
-
-        return fit_func
-
-    elif not amplitude and edelay:
-
-        def fit_func(*args):
-            return resonator_func(*args[:-1]) * np.exp(2j * np.pi * args[-1] * args[0])
-
-        return fit_func
-
-    elif amplitude and edelay:
-
-        def fit_func(*args):
-            return (
-                resonator_func(*args[:-3])
-                * (args[-3] + 1j * args[-2])
-                * np.exp(2j * np.pi * args[-1] * args[0])
-            )
-
-        return fit_func
-
-    else:
-
-        raise Exception("Unreachable")
-
-
 def meta_fit_edelay(freq, signal, rec_depth=0):
 
     quick_fit = get_abcd
@@ -188,8 +149,10 @@ def fit_signal(
     final_ls_opti=True,
     allow_mismatch=True,
     rec_depth=1,
-    suppress_warnings=False, 
+    api_warning=True,
 ):
+    if api_warning:
+        warnings.warn("fit_signal() is deprecated, please use analyze() instead, and analyze().plot() to display data.", UserWarning)
 
     if fit_edelay:
         edelay = meta_fit_edelay(freq, signal, rec_depth)
@@ -218,12 +181,30 @@ def fit_signal(
     if final_ls_opti:
         params, _ = complex_fit(fit_func, freq, signal, params)
     
-    resonator_params = ResonatorParams(params, geometry)
+    resonator_params = ResonatorParams(params, geometry, freq, signal)
 
-    if resonator_params.phi_0 is not None and np.abs(resonator_params.phi_0) > 0.25:
-        if suppress_warnings:
-            warnings.warn(
-                "Extracted phi_0 greater than 0.25, this might indicate a big impedance mismatch, values of kappa_i and kappa_c might be affected, you can try to set: allow_mismatch=False",
-                UserWarning
-            )
-    return fit_func, ResonatorParams(params, geometry)
+    if resonator_params.phi_0 is not None and  np.abs(resonator_params.phi_0) > 0.25:
+        warnings.warn("Extracted phi_0 greater than 0.25, this might indicate a big impedance mismatch, values of kappa_i and kappa_c might be affected, you can try to set: allow_mismatch=False", UserWarning)
+
+    return fit_func, ResonatorParams(params, geometry, freq, signal)
+
+def analyze(
+    freq,
+    signal,
+    geometry,
+    fit_amplitude=True,
+    fit_edelay=True,
+    final_ls_opti=True,
+    allow_mismatch=True,
+    rec_depth=1,
+):
+    return fit_signal(
+        freq,
+        signal,
+        geometry,
+        fit_amplitude,
+        fit_edelay,
+        final_ls_opti,
+        allow_mismatch,
+        rec_depth,
+        api_warning = False)[1]
