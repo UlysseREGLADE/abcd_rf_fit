@@ -511,14 +511,26 @@ class FitResult:
 
         result_dict = reconstruct_complex(result_dict)
 
-        # Create FitResult object
-        params = result_dict["fitted_params"]
-        geometry = result_dict["geometry"]
-        pcov = (
-            np.array(result_dict["covariance_matrix"])
-            if result_dict["covariance_matrix"]
-            else None
-        )
+        # Create FitResult object - handle both old and new format
+        if "fitted_params" in result_dict:
+            # Old format
+            params = result_dict["fitted_params"]
+            geometry = result_dict["geometry"]
+            pcov = (
+                np.array(result_dict["covariance_matrix"])
+                if result_dict["covariance_matrix"]
+                else None
+            )
+        else:
+            # New format - extract from raw_data
+            raw_data = result_dict["raw_data"]
+            params = raw_data["fitted_params"]
+            geometry = result_dict["geometry"]
+            pcov = (
+                np.array(raw_data["covariance_matrix"])
+                if raw_data["covariance_matrix"]
+                else None
+            )
 
         return cls(params, geometry, pcov=pcov)
 

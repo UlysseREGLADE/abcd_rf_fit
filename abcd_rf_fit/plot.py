@@ -220,9 +220,7 @@ def plot(
         mag_ax = fig.add_subplot(grid[0, :])
     
     if title is not None:
-        mag_ax.set_title(title)
-
-    # mag_ax.plot(freq_disp, dB(signal), ".C0")
+        mag_ax.set_title(title)    # mag_ax.plot(freq_disp, dB(signal), ".C0")
     mag_ax.scatter(
         freq_disp,
         dB(signal),
@@ -230,13 +228,12 @@ def plot(
         facecolors=facecolors,
         edgecolors="C0",
         alpha=alpha_fit,
-        label=params_label,
     )
     if fit is not None:
         mag_ax.plot(freq_disp, dB(fit), "-C1", label=fit_params_label, zorder=zorder)
 
     if fit_params_label is not None:
-        mag_ax.legend(bbox_to_anchor=(0.5*(1 + width_ratios[1]/width_ratios[0]), 1), loc='lower center')
+        mag_ax.legend(loc='upper right', framealpha=0.9)
     
     mag_ax.grid(alpha=0.3)
     mag_ax.set_ylabel(rf"$|{y_axis_str}|$ [dB]")
@@ -247,8 +244,7 @@ def plot(
     else:
         arg_ax = fig.add_subplot(grid[1, :])
 
-    if corrected_signal is None:
-        # arg_ax.plot(freq_disp, deg(signal), ".C0", label=params_label)
+    if corrected_signal is None:        # arg_ax.plot(freq_disp, deg(signal), ".C0", label=params_label)
         arg_ax.scatter(
             freq_disp,
             deg(signal),
@@ -256,7 +252,6 @@ def plot(
             facecolors=facecolors,
             edgecolors="C0",
             alpha=alpha_fit,
-            label=params_label,
         )
         if fit is not None:
             arg_ax.plot(freq_disp, deg(fit), "-C1", zorder=zorder)
@@ -270,8 +265,7 @@ def plot(
                 facecolors=facecolors,
                 edgecolors="C0",
                 alpha=0.15 * alpha_fit,
-            )
-        # arg_ax.plot(freq_disp, deg(corrected_signal), ".C0", label=params_label)
+            )        # arg_ax.plot(freq_disp, deg(corrected_signal), ".C0", label=params_label)
         arg_ax.scatter(
             freq_disp,
             deg(corrected_signal),
@@ -279,7 +273,6 @@ def plot(
             facecolors=facecolors,
             edgecolors="C0",
             alpha=alpha_fit,
-            label=params_label,
         )
         if fit is not None:
             if plot_not_corrected:
