@@ -1,49 +1,111 @@
-from inspect import signature
+"""Resonator parameter classes and quality assessment tools.
+
+This module provides the ResonatorParams class for storing resonator parameters
+and the FitResult class for comprehensive fit quality assessment, including
+parameter uncertainties, goodness of fit metrics, and validation functionality.
+"""
+
+import json
+from typing import Any, Dict, List, Optional
+
 import numpy as np
-from .utils import (
-    guess_edelay_from_gradient,
-    smooth_gradient,
-    complex_fit,
-)
 
-from .resonators import *
+from .utils import get_prefix_str
 
 
-class FitResult(object):
+class FitResult:
+    """Container for resonator fit results with uncertainty and quality analysis.
+
+    This class wraps ResonatorParams and adds covariance matrix storage,
+    parameter uncertainty calculation, goodness of fit metrics, fit validation,
+    and result serialization capabilities.
+
+    Parameters
+    ----------
+    params : list
+        Resonator parameter values.
+    geometry : str
+        Resonator measurement geometry.
+    pcov : np.ndarray, optional
+        Parameter covariance matrix from fitting.
+    fit_func : callable, optional
+        Fitted function for quality assessment.
+
+    Attributes
+    ----------
+    resonator_params : ResonatorParams
+        Container for the resonator parameters.
+    pcov : np.ndarray or None
+        Parameter covariance matrix.
+    fit_func : callable or None
+        Fitted function.
     """
-    Container for fit results including parameters, covariance matrix, and quality metrics
-    """
 
-    def __init__(self, params, geometry, pcov=None, fit_func=None):
+    def __init__(
+        self,
+        params: List[float],
+        geometry: str,
+        pcov: Optional[np.ndarray] = None,
+        fit_func: Optional[callable] = None,
+    ):
+        """Initialize FitResult with parameters and optional covariance matrix."""
         self.resonator_params = ResonatorParams(params, geometry)
         self.pcov = pcov
         self.fit_func = fit_func
 
     @property
-    def params(self):
-        """Access to the ResonatorParams object"""
+    def params(self) -> "ResonatorParams":
+        """Access to the ResonatorParams object.
+
+        Returns
+        -------
+        ResonatorParams
+            The resonator parameters container.
+        """
         return self.resonator_params
 
     @property
-    def param_errors(self):
-        """Calculate parameter uncertainties from covariance matrix"""
+    def param_errors(self) -> Optional[np.ndarray]:
+        """Calculate parameter uncertainties from covariance matrix.
+
+        Returns
+        -------
+        np.ndarray or None
+            Parameter standard errors (square root of diagonal elements
+            of covariance matrix), or None if covariance matrix unavailable.
+        """
         if self.pcov is not None:
             return np.sqrt(np.diag(self.pcov))
-        else:
-            return None
+        return None
 
     @property
-    def correlation_matrix(self):
-        """Calculate correlation matrix from covariance matrix"""
+    def correlation_matrix(self) -> Optional[np.ndarray]:
+        """Calculate correlation matrix from covariance matrix.
+
+        Returns
+        -------
+        np.ndarray or None
+            Parameter correlation matrix, or None if covariance matrix unavailable.
+        """
         if self.pcov is not None:
             std_devs = np.sqrt(np.diag(self.pcov))
-            correlation = self.pcov / np.outer(std_devs, std_devs)
-            return correlation
-        else:
-            return None
+            return self.pcov / np.outer(std_devs, std_devs)
+        return None
 
-    def get_param_error(self, param_name):
-        """Get uncertainty for a specific parameter"""
+    def get_param_error(self, param_name: str) -> Optional[float]:
+        """Get uncertainty for a specific parameter.
+
+        Parameters
+        ----------
+        param_name : str
+            Name of the parameter ('f_0', 'kappa', 'kappa_c', 'phi_0',
+            're_a_in', 'im_a_in', 'edelay').
+
+        Returns
+        -------
+        float or None
+            Parameter uncertainty, or None if unavailable.
+        """
         if self.param_errors is None:
             return None
 
@@ -66,11 +128,32 @@ class FitResult(object):
 
         if param_name in param_map:
             return self.param_errors[param_map[param_name]]
-        else:
-            return None
+        return None
 
-    def goodness_of_fit(self, freq, signal):
-        """Calculate goodness of fit metrics"""
+    def goodness_of_fit(
+        self, freq: np.ndarray, signal: np.ndarray
+    ) -> Optional[Dict[str, float]]:
+        """Calculate goodness of fit metrics.
+
+        Computes various statistical measures to assess the quality of the fit,
+        including R-squared, reduced chi-squared, and RMS residual.
+
+        Parameters
+        ----------
+        freq : np.ndarray
+            Frequency array used in the fit.
+        signal : np.ndarray
+            Original signal data that was fitted.
+
+        Returns
+        -------
+        dict or None
+            Dictionary containing fit quality metrics:
+            - 'r_squared': Coefficient of determination (0-1, higher is better)
+            - 'reduced_chi_squared': Reduced chi-squared statistic
+            - 'rms_residual': Root mean square of residuals
+            Returns None if fit function is not available.
+        """
         if self.fit_func is None:
             return None
 
@@ -102,30 +185,44 @@ class FitResult(object):
     def __repr__(self):
         return self.__str__()
 
-    def validate_fit(self, freq, signal, strict=False):
-        """
-        Comprehensive fit validation with automatic warnings and recommendations
+    def validate_fit(
+        self, freq: np.ndarray, signal: np.ndarray, strict: bool = False
+    ) -> Dict[str, Any]:
+        """Comprehensive fit validation with automatic warnings and recommendations.
 
-        Args:
-            freq: Frequency array
-            signal: Signal array
-            strict: If True, apply stricter validation criteria
+        Performs extensive validation of the fit quality including parameter
+        bounds checking, uncertainty analysis, and goodness of fit assessment.
 
-        Returns:
-            dict: Validation results with status, warnings, and recommendations
+        Parameters
+        ----------
+        freq : np.ndarray
+            Frequency array used in the fit.
+        signal : np.ndarray
+            Signal array that was fitted.
+        strict : bool, optional
+            If True, apply stricter validation criteria. Default is False.
+
+        Returns
+        -------
+        dict
+            Validation results containing:
+            - 'status': Overall validation status ('excellent', 'good', 'warning', 'poor')
+            - 'warnings': List of validation warnings
+            - 'recommendations': List of improvement recommendations
+            - 'metrics': Dictionary of computed validation metrics
         """
         validation = {
-            'status': 'good',
-            'warnings': [],
-            'recommendations': [],
-            'metrics': {}
+            "status": "good",
+            "warnings": [],
+            "recommendations": [],
+            "metrics": {},
         }
 
         # 1. Parameter uncertainty validation
         if self.param_errors is not None:
             # Check if any parameter has very large uncertainty
             rel_errors = []
-            param_names = ['f_0', 'kappa_c', 'edelay']
+            param_names = ["f_0", "kappa_c", "edelay"]
 
             for param_name in param_names:
                 param_val = getattr(self.resonator_params, param_name, None)
@@ -134,46 +231,46 @@ class FitResult(object):
                 if param_val is not None and param_err is not None and param_val != 0:
                     rel_error = abs(param_err / param_val)
                     rel_errors.append((param_name, rel_error))
-                    validation['metrics'][f'{param_name}_relative_error'] = rel_error
+                    validation["metrics"][f"{param_name}_relative_error"] = rel_error
 
                     # Flag parameters with high uncertainty
                     threshold = 0.1 if strict else 0.2  # 10% or 20% relative error
                     if rel_error > threshold:
-                        validation['warnings'].append(
-                            f"{param_name} has high uncertainty ({rel_error*100:.1f}%)"
+                        validation["warnings"].append(
+                            f"{param_name} has high uncertainty ({rel_error * 100:.1f}%)"
                         )
-                        validation['recommendations'].append(
+                        validation["recommendations"].append(
                             f"Consider more data points or lower noise for better {param_name} determination"
                         )
 
         # 2. Goodness of fit validation
         gof = self.goodness_of_fit(freq, signal)
         if gof is not None:
-            validation['metrics'].update(gof)
+            validation["metrics"].update(gof)
 
             # R-squared validation
             r2_threshold = 0.95 if strict else 0.9
-            if gof['r_squared'] < r2_threshold:
-                validation['warnings'].append(
+            if gof["r_squared"] < r2_threshold:
+                validation["warnings"].append(
                     f"Low R² = {gof['r_squared']:.3f} (< {r2_threshold})"
                 )
-                validation['recommendations'].append(
+                validation["recommendations"].append(
                     "Consider different geometry or check for systematic errors"
                 )
 
             # Reduced chi-squared validation
-            if gof['reduced_chi_squared'] > 5:
-                validation['warnings'].append(
+            if gof["reduced_chi_squared"] > 5:
+                validation["warnings"].append(
                     f"High χ²_red = {gof['reduced_chi_squared']:.2f} (>> 1)"
                 )
-                validation['recommendations'].append(
+                validation["recommendations"].append(
                     "Systematic residuals detected - model may be inadequate"
                 )
-            elif gof['reduced_chi_squared'] < 0.1:
-                validation['warnings'].append(
+            elif gof["reduced_chi_squared"] < 0.1:
+                validation["warnings"].append(
                     f"Very low χ²_red = {gof['reduced_chi_squared']:.2f} (<< 1)"
                 )
-                validation['recommendations'].append(
+                validation["recommendations"].append(
                     "Possible overfitting or underestimated noise"
                 )
 
@@ -187,10 +284,10 @@ class FitResult(object):
             for i in range(n_params):
                 for j in range(i + 1, n_params):
                     if abs(corr_matrix[i, j]) > high_corr_threshold:
-                        validation['warnings'].append(
+                        validation["warnings"].append(
                             f"Parameters {i} and {j} are highly correlated ({corr_matrix[i, j]:.3f})"
                         )
-                        validation['recommendations'].append(
+                        validation["recommendations"].append(
                             "High parameter correlation may indicate overparameterization"
                         )
 
@@ -203,10 +300,10 @@ class FitResult(object):
             # Resonance should be near the measurement range
             f_0_deviation = abs(self.resonator_params.f_0 - freq_center) / freq_range
             if f_0_deviation > 0.6:  # Resonance more than 60% away from center
-                validation['warnings'].append(
-                    f"Resonance frequency far from measurement center ({f_0_deviation*100:.1f}% of span)"
+                validation["warnings"].append(
+                    f"Resonance frequency far from measurement center ({f_0_deviation * 100:.1f}% of span)"
                 )
-                validation['recommendations'].append(
+                validation["recommendations"].append(
                     "Consider adjusting frequency range to center on resonance"
                 )
 
@@ -214,195 +311,200 @@ class FitResult(object):
             freq_span = freq[-1] - freq[0]
             # Linewidth should be reasonable compared to frequency span
             if self.resonator_params.kappa > freq_span:
-                validation['warnings'].append(
+                validation["warnings"].append(
                     "Linewidth larger than frequency span - may be over-broadened"
                 )
             elif self.resonator_params.kappa < freq_span / 1000:
-                validation['warnings'].append(
+                validation["warnings"].append(
                     "Linewidth much smaller than frequency span - may need higher resolution"
                 )
 
         # Set overall status
-        if len(validation['warnings']) == 0:
-            validation['status'] = 'excellent'
-        elif len(validation['warnings']) <= 2:
-            validation['status'] = 'good'
-        elif len(validation['warnings']) <= 4:
-            validation['status'] = 'acceptable'
+        if len(validation["warnings"]) == 0:
+            validation["status"] = "excellent"
+        elif len(validation["warnings"]) <= 2:
+            validation["status"] = "good"
+        elif len(validation["warnings"]) <= 4:
+            validation["status"] = "acceptable"
         else:
-            validation['status'] = 'poor'
+            validation["status"] = "poor"
 
         return validation
 
     def to_dict(self):
-        """Export fit results to dictionary for saving/serialization"""
+        """Export fit results to dictionary for saving/serialization."""
         result_dict = {
-            'fitted_params': self.resonator_params.params,
-            'geometry': None,  # We need to store geometry info
-            'param_errors': self.param_errors.tolist() if self.param_errors is not None else None,
-            'covariance_matrix': self.pcov.tolist() if self.pcov is not None else None,
-            'correlation_matrix': self.correlation_matrix.tolist() if self.correlation_matrix is not None else None,
+            "fitted_params": self.resonator_params.params,
+            "geometry": None,  # We need to store geometry info
+            "param_errors": self.param_errors.tolist()
+            if self.param_errors is not None
+            else None,
+            "covariance_matrix": self.pcov.tolist() if self.pcov is not None else None,
+            "correlation_matrix": self.correlation_matrix.tolist()
+            if self.correlation_matrix is not None
+            else None,
         }
-        
+
         # Try to determine geometry from resonator function
         for geom, func in resonator_dict.items():
             if self.resonator_params.resonator_func == func:
-                result_dict['geometry'] = geom
+                result_dict["geometry"] = geom
                 break
-                
+
         return result_dict
-    
+
     def save_to_file(self, filename):
-        """Save fit results to JSON file"""
-        import json
-        
+        """Save fit results to JSON file."""
         result_dict = self.to_dict()
-        
+
         # Convert numpy arrays to lists for JSON serialization
         def convert_numpy(obj):
             if isinstance(obj, np.ndarray):
                 return obj.tolist()
-            elif isinstance(obj, (np.integer, np.floating)):
+            if isinstance(obj, (np.integer, np.floating)):
                 return float(obj)
-            elif isinstance(obj, np.complexfloating):
-                return {'real': float(obj.real), 'imag': float(obj.imag)}
+            if isinstance(obj, np.complexfloating):
+                return {"real": float(obj.real), "imag": float(obj.imag)}
             return obj
-        
+
         # Apply conversion recursively
         def deep_convert(obj):
             if isinstance(obj, dict):
                 return {k: deep_convert(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
+            if isinstance(obj, list):
                 return [deep_convert(v) for v in obj]
-            else:
-                return convert_numpy(obj)
-        
+            return convert_numpy(obj)
+
         result_dict = deep_convert(result_dict)
-        
-        with open(filename, 'w') as f:
+
+        with open(filename, "w") as f:
             json.dump(result_dict, f, indent=2)
-            
+
     @classmethod
     def load_from_file(cls, filename):
-        """Load fit results from JSON file"""
-        import json
-        
-        with open(filename, 'r') as f:
+        """Load fit results from JSON file."""
+        with open(filename) as f:
             result_dict = json.load(f)
-        
+
         # Reconstruct complex numbers
         def reconstruct_complex(obj):
             if isinstance(obj, dict):
-                if 'real' in obj and 'imag' in obj:
-                    return complex(obj['real'], obj['imag'])
-                else:
-                    return {k: reconstruct_complex(v) for k, v in obj.items()}
-            elif isinstance(obj, list):
+                if "real" in obj and "imag" in obj:
+                    return complex(obj["real"], obj["imag"])
+                return {k: reconstruct_complex(v) for k, v in obj.items()}
+            if isinstance(obj, list):
                 return [reconstruct_complex(v) for v in obj]
             return obj
-        
+
         result_dict = reconstruct_complex(result_dict)
-        
+
         # Create FitResult object
-        params = result_dict['fitted_params']
-        geometry = result_dict['geometry']
-        pcov = np.array(result_dict['covariance_matrix']) if result_dict['covariance_matrix'] else None
-        
-        fit_result = cls(params, geometry, pcov=pcov)
-        return fit_result
+        params = result_dict["fitted_params"]
+        geometry = result_dict["geometry"]
+        pcov = (
+            np.array(result_dict["covariance_matrix"])
+            if result_dict["covariance_matrix"]
+            else None
+        )
+
+        return cls(params, geometry, pcov=pcov)
 
     def compare_with(self, other_fit_result, freq, signal):
         """
-        Compare this fit result with another fit result
-        
+        Compare this fit result with another fit result.
+
         Args:
             other_fit_result: Another FitResult object
             freq: Frequency array for comparison
             signal: Original signal for comparison
-            
-        Returns:
+
+        Returns
+        -------
             dict: Comparison results
         """
         comparison = {
-            'parameter_differences': {},
-            'quality_comparison': {},
-            'recommendation': None
+            "parameter_differences": {},
+            "quality_comparison": {},
+            "recommendation": None,
         }
-        
+
         # Parameter comparison
-        param_names = ['f_0', 'kappa', 'kappa_c', 'edelay', 'phi_0']
-        
+        param_names = ["f_0", "kappa", "kappa_c", "edelay", "phi_0"]
+
         for param_name in param_names:
             val1 = getattr(self.resonator_params, param_name, None)
             val2 = getattr(other_fit_result.resonator_params, param_name, None)
-            
+
             if val1 is not None and val2 is not None:
                 diff = abs(val1 - val2)
-                rel_diff = diff / abs(val1) if val1 != 0 else float('inf')
-                
+                rel_diff = diff / abs(val1) if val1 != 0 else float("inf")
+
                 # Get uncertainties if available
                 err1 = self.get_param_error(param_name)
                 err2 = other_fit_result.get_param_error(param_name)
-                
+
                 param_comparison = {
-                    'absolute_difference': diff,
-                    'relative_difference': rel_diff,
-                    'value_1': val1,
-                    'value_2': val2,
-                    'error_1': err1,
-                    'error_2': err2
+                    "absolute_difference": diff,
+                    "relative_difference": rel_diff,
+                    "value_1": val1,
+                    "value_2": val2,
+                    "error_1": err1,
+                    "error_2": err2,
                 }
-                
+
                 # Statistical significance test
                 if err1 is not None and err2 is not None:
                     combined_error = np.sqrt(err1**2 + err2**2)
-                    significance = diff / combined_error if combined_error > 0 else float('inf')
-                    param_comparison['statistical_significance'] = significance
-                    param_comparison['statistically_different'] = significance > 2  # 2-sigma test
-                
-                comparison['parameter_differences'][param_name] = param_comparison
-        
+                    significance = (
+                        diff / combined_error if combined_error > 0 else float("inf")
+                    )
+                    param_comparison["statistical_significance"] = significance
+                    param_comparison["statistically_different"] = (
+                        significance > 2
+                    )  # 2-sigma test
+
+                comparison["parameter_differences"][param_name] = param_comparison
+
         # Quality comparison
         gof1 = self.goodness_of_fit(freq, signal)
         gof2 = other_fit_result.goodness_of_fit(freq, signal)
-        
+
         if gof1 is not None and gof2 is not None:
-            comparison['quality_comparison'] = {
-                'r_squared_1': gof1['r_squared'],
-                'r_squared_2': gof2['r_squared'],
-                'r_squared_diff': gof1['r_squared'] - gof2['r_squared'],
-                'chi_squared_1': gof1['reduced_chi_squared'],
-                'chi_squared_2': gof2['reduced_chi_squared'],
-                'chi_squared_ratio': gof1['reduced_chi_squared'] / gof2['reduced_chi_squared']
+            comparison["quality_comparison"] = {
+                "r_squared_1": gof1["r_squared"],
+                "r_squared_2": gof2["r_squared"],
+                "r_squared_diff": gof1["r_squared"] - gof2["r_squared"],
+                "chi_squared_1": gof1["reduced_chi_squared"],
+                "chi_squared_2": gof2["reduced_chi_squared"],
+                "chi_squared_ratio": gof1["reduced_chi_squared"]
+                / gof2["reduced_chi_squared"],
             }
-            
+
             # Recommendation based on quality
-            if gof1['r_squared'] > gof2['r_squared'] + 0.01:  # 1% improvement
-                comparison['recommendation'] = 'fit_1_better'
-            elif gof2['r_squared'] > gof1['r_squared'] + 0.01:
-                comparison['recommendation'] = 'fit_2_better'
+            if gof1["r_squared"] > gof2["r_squared"] + 0.01:  # 1% improvement
+                comparison["recommendation"] = "fit_1_better"
+            elif gof2["r_squared"] > gof1["r_squared"] + 0.01:
+                comparison["recommendation"] = "fit_2_better"
             else:
-                comparison['recommendation'] = 'equivalent_quality'
-        
+                comparison["recommendation"] = "equivalent_quality"
+
         return comparison
 
-if __name__ == "__main__":
 
+if __name__ == "__main__":
     from utils import (
-        zeros2eps,
         get_prefix_str,
+        zeros2eps,
     )
 
 else:
-
     from .utils import (
-        zeros2eps,
         get_prefix_str,
+        zeros2eps,
     )
 
 
 def transmission(freq, f_0, kappa):
-
     num = 1
     den = 2j * (freq - f_0) + kappa
 
@@ -410,28 +512,24 @@ def transmission(freq, f_0, kappa):
 
 
 def reflection(freq, f_0, kappa, kappa_c_real, phi_0=0):
-
-    num = 2j * (freq - f_0) + kappa - 2*kappa_c_real*(1+1j*np.tan(phi_0))
+    num = 2j * (freq - f_0) + kappa - 2 * kappa_c_real * (1 + 1j * np.tan(phi_0))
     den = 2j * (freq - f_0) + kappa
 
     return num / zeros2eps(den)
 
 
 def reflection_mismatched(freq, f_0, kappa, kappa_c_real, phi_0):
-
     return reflection(freq, f_0, kappa, kappa_c_real, phi_0)
 
 
 def hanger(freq, f_0, kappa, kappa_c_real, phi_0=0):
-
-    num = 2j * (freq - f_0) + kappa - kappa_c_real*(1+1j*np.tan(phi_0))
+    num = 2j * (freq - f_0) + kappa - kappa_c_real * (1 + 1j * np.tan(phi_0))
     den = 2j * (freq - f_0) + kappa
 
     return num / zeros2eps(den)
 
 
 def hanger_mismatched(freq, f_0, kappa, kappa_c_real, phi_0):
-
     return hanger(freq, f_0, kappa, kappa_c_real, phi_0)
 
 
@@ -449,9 +547,49 @@ resonator_dict = {
 }
 
 
-class ResonatorParams(object):
-    def __init__(self, params, geometry):
+class ResonatorParams:
+    """Container for resonator parameters with geometry-specific access methods.
 
+    This class provides parameter storage and convenient property-based access
+    to resonator parameters based on the measurement geometry. It automatically
+    maps parameters to appropriate indices and provides properties for easy
+    access to physical quantities like f_0, kappa, Q-factors, etc.
+
+    Parameters
+    ----------
+    params : list of float
+        List of parameter values in geometry-specific order.
+    geometry : str
+        Resonator measurement geometry identifier:
+        - 't' or 'transmission': Transmission measurement
+        - 'r' or 'reflection': Reflection measurement
+        - 'h' or 'hanger': Hanger measurement
+        - 'rm' or 'reflection_mismatched': Reflection with impedance mismatch
+        - 'hm' or 'hanger_mismatched': Hanger with impedance mismatch
+
+    Attributes
+    ----------
+    resonator_func : callable
+        Resonator function corresponding to the geometry.
+    params : list
+        Parameter values.
+    f_0_index : int, optional
+        Index of resonance frequency parameter.
+    kappa_index : int, optional
+        Index of total coupling rate parameter.
+    kappa_c_real_index : int, optional
+        Index of external coupling rate parameter.
+    phi_0_index : int, optional
+        Index of phase offset parameter.
+    re_a_in_index : int, optional
+        Index of real part of input amplitude.
+    im_a_in_index : int, optional
+        Index of imaginary part of input amplitude.
+    edelay_index : int, optional
+        Index of electrical delay parameter.
+    """
+
+    def __init__(self, params: List[float], geometry: str):
         self.resonator_func = resonator_dict[geometry]
         self.params = params
 
@@ -480,87 +618,230 @@ class ResonatorParams(object):
             self.kappa_c_real_index = 2
             self.phi_0_index = 3
             if len(self.params) in [6, 7]:
-                self.re_a_in_index = 3
-                self.im_a_in_index = 4
+                self.re_a_in_index = 4
+                self.im_a_in_index = 5
             if len(self.params) in [5, 7]:
                 self.edelay_index = -1
 
     def tolist(self):
+        """Convert parameters to numpy array.
+
+        Returns
+        -------
+        np.ndarray
+            Parameter array.
+        """
         return np.array(self.params)
 
     @property
     def f_0(self):
+        """Resonance frequency parameter.
+
+        Returns
+        -------
+        float or None
+            Resonance frequency f_0, or None if not available for this geometry.
+        """
         if hasattr(self, "f_0_index"):
             return self.params[self.f_0_index]
-        else:
-            return None
+        return None
 
     @property
     def kappa(self):
+        """Total coupling rate parameter.
+
+        Returns
+        -------
+        float or None
+            Total coupling rate kappa, or None if not available for this geometry.
+        """
         if hasattr(self, "kappa_index"):
             return self.params[self.kappa_index]
-        else:
-            None
+        return None
 
     @property
     def kappa_i(self):
+        """Internal coupling rate parameter.
+
+        Returns
+        -------
+        float or None
+            Internal coupling rate kappa_i = kappa - kappa_c, or None if not available.
+        """
         if hasattr(self, "kappa_index") and hasattr(self, "kappa_c_real_index"):
             return self.params[self.kappa_index] - self.params[self.kappa_c_real_index]
-        else:
-            return None
+        return None
 
     @property
     def kappa_c_real(self):
+        """External coupling rate parameter (real part).
+
+        Returns
+        -------
+        float or None
+            External coupling rate kappa_c, or None if not available for this geometry.
+        """
         if hasattr(self, "kappa_c_real_index"):
             return self.params[self.kappa_c_real_index]
-        else:
-            return None
+        return None
 
     @property
     def kappa_c(self):
+        """External coupling rate parameter.
+
+        Returns
+        -------
+        float or None
+            External coupling rate kappa_c (alias for kappa_c_real).
+        """
         return self.kappa_c_real
 
     @property
+    def Q_i(self):
+        """Internal quality factor.
+
+        Returns
+        -------
+        float or None
+            Internal quality factor Q_i = f_0 / kappa_i, or None if not calculable.
+        """
+        if self.f_0 is not None and self.kappa_i is not None and self.kappa_i != 0:
+            return self.f_0 / self.kappa_i
+        return None
+
+    @property
+    def Q_c(self):
+        """External quality factor.
+
+        Returns
+        -------
+        float or None
+            External quality factor Q_c = f_0 / kappa_c, or None if not calculable.
+        """
+        if self.f_0 is not None and self.kappa_c is not None and self.kappa_c != 0:
+            return self.f_0 / self.kappa_c
+        return None
+
+    @property
+    def Q_total(self):
+        """Total quality factor.
+
+        Returns
+        -------
+        float or None
+            Total quality factor Q_total = f_0 / kappa, or None if not calculable.
+        """
+        if self.f_0 is not None and self.kappa is not None and self.kappa != 0:
+            return self.f_0 / self.kappa
+        return None
+
+    @property
+    def Q(self):
+        """Total quality factor (alias for Q_total).
+
+        Returns
+        -------
+        float or None
+            Total quality factor Q = f_0 / kappa.
+        """
+        return self.Q_total @ property
+
     def a_in(self):
+        """Complex input amplitude parameter.
+
+        Returns
+        -------
+        complex or None
+            Complex input amplitude a_in = re_a_in + 1j*im_a_in, or None if not available.
+        """
         if hasattr(self, "re_a_in_index") and hasattr(self, "im_a_in_index"):
             return (
                 self.params[self.re_a_in_index] + 1j * self.params[self.im_a_in_index]
             )
-        else:
-            return None
+        return None
 
     @property
     def re_a_in(self):
+        """Real part of input amplitude parameter.
+
+        Returns
+        -------
+        float or None
+            Real part of input amplitude, or None if not available.
+        """
         a_in = self.a_in
         if a_in is not None:
             return np.real(a_in)
-        else:
-            return None
+        return None
 
     @property
     def im_a_in(self):
+        """Imaginary part of input amplitude parameter.
+
+        Returns
+        -------
+        float or None
+            Imaginary part of input amplitude, or None if not available.
+        """
         a_in = self.a_in
         if a_in is not None:
             return np.imag(a_in)
-        else:
-            return None
+        return None
 
     @property
     def edelay(self):
+        """Electrical delay parameter.
+
+        Returns
+        -------
+        float or None
+            Electrical delay in seconds, or None if not available for this geometry.
+        """
         if hasattr(self, "edelay_index"):
             return self.params[self.edelay_index]
-        else:
-            return None
+        return None
 
     @property
     def phi_0(self):
+        """Phase offset parameter for mismatched geometries.
+
+        Returns
+        -------
+        float or None
+            Phase offset phi_0 in radians, or None if not available for this geometry.
+        """
         if hasattr(self, "phi_0_index"):
             return self.params[self.phi_0_index]
-        else:
-            return None
+        return None
 
-    def str(self, latex=False, separator=", ", precision=2, only_f_and_kappa=False, f_precision=5):
+    def str(
+        self,
+        latex=False,
+        separator=", ",
+        precision=2,
+        only_f_and_kappa=False,
+        f_precision=5,
+    ):
+        """Generate formatted string representation of resonator parameters.
 
+        Parameters
+        ----------
+        latex : bool, optional
+            If True, use LaTeX formatting for parameter names. Default is False.
+        separator : str, optional
+            String to use as separator between parameters. Default is ", ".
+        precision : int, optional
+            Number of significant digits for parameter values. Default is 2.
+        only_f_and_kappa : bool, optional
+            If True, only include f_0 and kappa parameters. Default is False.
+        f_precision : int, optional
+            Number of significant digits for frequency. Default is 5.
+
+        Returns
+        -------
+        str
+            Formatted string representation of parameters.
+        """
         kappa = {False: "kappa/2pi", True: r"$\kappa/2\pi$"}
         kappa_i = {False: "kappa_i/2pi", True: r"$\kappa_i/2\pi$"}
         kappa_c = {False: "kappa_c/2pi", True: r"$\kappa_c/2\pi$"}
@@ -568,49 +849,50 @@ class ResonatorParams(object):
         f_0 = {False: "f_0", True: r"$f_0$"}
 
         if self.edelay is not None:
-            edelay_str = "%sedelay = %ss" % (separator, get_prefix_str(self.edelay, precision))
+            edelay_str = (
+                f"{separator}edelay = {get_prefix_str(self.edelay, precision)}s"
+            )
         else:
             edelay_str = ""
 
         if self.resonator_func == transmission:
-            kappa_str = r"%s%s = %sHz" % (
-                separator,
-                kappa[latex],
-                get_prefix_str(self.kappa, precision),
-            )
+            kappa_str = rf"{separator}{kappa[latex]} = {get_prefix_str(self.kappa, precision)}Hz"
         else:
-            kappa_str = r"%s%s = %sHz%s%s = %sHz" % (
-                separator,
-                kappa_i[latex],
-                get_prefix_str(self.kappa_i, precision),
-                separator,
-                kappa_c[latex],
-                get_prefix_str(self.kappa_c, precision),
-            )
+            kappa_str = rf"{separator}{kappa_i[latex]} = {get_prefix_str(self.kappa_i, precision)}Hz{separator}{kappa_c[latex]} = {get_prefix_str(self.kappa_c, precision)}Hz"
 
         if self.resonator_func in [hanger_mismatched, reflection_mismatched]:
-            phi_0_str = r"%s%s = %0.2f rad" % (separator, phi_0[latex], self.phi_0)
+            phi_0_str = rf"{separator}{phi_0[latex]} = {self.phi_0:0.2f} rad"
         else:
             phi_0_str = ""
 
-        f_0_str = r"%s = %sHz" % (f_0[latex], get_prefix_str(self.f_0, f_precision))
+        f_0_str = rf"{f_0[latex]} = {get_prefix_str(self.f_0, f_precision)}Hz"
 
         if only_f_and_kappa:
             return f_0_str + kappa_str
-        else:
-            return f_0_str + kappa_str + phi_0_str + edelay_str
+        return f_0_str + kappa_str + phi_0_str + edelay_str
 
     def __str__(self) -> str:
+        """Return string representation of resonator parameters.
 
+        Returns
+        -------
+        str
+            Formatted string showing the resonator parameters.
+        """
         return self.str()
 
     def __repr__(self):
+        """Return unambiguous string representation of resonator parameters.
 
+        Returns
+        -------
+        str
+            String representation for debugging and logging.
+        """
         return self.str()
 
 
 if __name__ == "__main__":
-
     f_0 = 3.8e9
     kappa_i = 50e6
     kappa_c = 150e6
@@ -623,8 +905,6 @@ if __name__ == "__main__":
 
     params = ResonatorParams(params, geometry)
 
-    print(params)
-
     f_0 = 3.8e9
     kappa_i = 50e6
     kappa_c = 150e6
@@ -636,8 +916,6 @@ if __name__ == "__main__":
 
     params = ResonatorParams(params, geometry)
 
-    print(params)
-
     f_0 = 3.8e9
     kappa = 50e6
     a_in = 1 + 1j
@@ -646,5 +924,3 @@ if __name__ == "__main__":
     params = [f_0, kappa_i, kappa_c, phi_0, np.real(a_in), np.imag(a_in)]
 
     params = ResonatorParams(params, geometry)
-
-    print(params)
