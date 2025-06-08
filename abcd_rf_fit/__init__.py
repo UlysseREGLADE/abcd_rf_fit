@@ -8,7 +8,7 @@ __all__ = [
     "ResonatorParams",
     "fit_signal",
     "get_abcd",
-    "analize",
+    "analyze",
     "get_synthetic_signal",
     "plot",
 ]

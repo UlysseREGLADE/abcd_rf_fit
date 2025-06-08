@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.gridspec import GridSpec
 
-from .resonators import resonator_dict
 from .utils import dB, deg, get_prefix
 
 cm = 1/2.54  # centimeters in inches
@@ -212,9 +211,7 @@ def plot(
             center = 0.5*(xlim[1] + xlim[0])
             delta = 0.5*(xlim[1] - xlim[0])
             delta /= ratio
-            circle_ax.set_xlim(center-delta, center+delta)
-
-        # circle_ax.set_aspect("equal")
+            circle_ax.set_xlim(center-delta, center+delta)        # circle_ax.set_aspect("equal")
         circle_ax.grid(alpha=0.3)
 
     if plot_circle:
@@ -233,7 +230,8 @@ def plot(
         facecolors=facecolors,
         edgecolors="C0",
         alpha=alpha_fit,
-    , label=params_label)
+        label=params_label,
+    )
     if fit is not None:
         mag_ax.plot(freq_disp, dB(fit), "-C1", label=fit_params_label, zorder=zorder)
 
@@ -257,7 +255,7 @@ def plot(
             s=size,
             facecolors=facecolors,
             edgecolors="C0",
-            alpha=alpha_fit)# ,
+            alpha=alpha_fit,
             label=params_label,
         )
         if fit is not None:
@@ -280,7 +278,7 @@ def plot(
             s=size,
             facecolors=facecolors,
             edgecolors="C0",
-            alpha=alpha_fit)# ,
+            alpha=alpha_fit,
             label=params_label,
         )
         if fit is not None:

@@ -439,3 +439,23 @@ def fit_signal(
     # Return FitResult object with covariance matrix information
     fit_result = FitResult(params, geometry, pcov, fit_func)
     return fit_func, fit_result
+
+def analyze(
+    freq,
+    signal,
+    geometry,
+    fit_amplitude=True,
+    fit_edelay=True,
+    final_ls_opti=True,
+    allow_mismatch=True,
+    rec_depth=1,
+):
+    return fit_signal(
+        freq,
+        signal,
+        geometry,
+        fit_amplitude,
+        fit_edelay,
+        final_ls_opti,
+        allow_mismatch,
+        rec_depth)[1]
