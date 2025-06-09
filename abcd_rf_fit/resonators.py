@@ -57,11 +57,32 @@ class FitResult:
         signal: Optional[np.ndarray] = None,
         pcov: Optional[np.ndarray] = None,
         fit_func: Optional[callable] = None,
+        original_signal: Optional[np.ndarray] = None,
     ):
-        """Initialize FitResult with parameters and optional covariance matrix."""
+        """
+        Initialize FitResult with parameters and optional covariance matrix.
+
+        Parameters
+        ----------
+        params : List[float]
+            Resonator parameter values.
+        geometry : str
+            Resonator measurement geometry.
+        freq : np.ndarray, optional
+            Frequency array used in the fit.
+        signal : np.ndarray, optional
+            Signal array that was fitted (after background removal if applied).
+        pcov : np.ndarray, optional
+            Parameter covariance matrix from fitting.
+        fit_func : callable, optional
+            Fitted function for quality assessment.
+        original_signal : np.ndarray, optional
+            Original signal array before any background removal.
+        """
         self.resonator_params = ResonatorParams(params, geometry)
         self.freq = freq
-        self.signal = signal
+        self.signal = signal  # Background-corrected signal used for fitting
+        self.original_signal = original_signal  # Original signal before background removal
         self.pcov = pcov
         self.fit_func = fit_func
 

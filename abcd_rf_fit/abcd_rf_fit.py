@@ -338,11 +338,38 @@ def _fit_signal_core(
     allow_mismatch: bool = True,
     rec_depth: int = 1,
     suppress_warnings: bool = False,
+    remove_background: bool = False,
 ) -> FitResult:
-    """Core fitting implementation without API redundancy.
-    
-    This is the internal implementation that returns only a FitResult object.
     """
+    Core fitting implementation without API redundancy.
+
+    This is the internal implementation that returns only a FitResult object.
+
+    Parameters
+    ----------
+    remove_background : bool, optional
+        If True, remove linear background trends in magnitude and phase 
+        using the first and last ~5% of data points (default: True).
+    """
+    # Store original signal for FitResult
+    original_signal = signal.copy()
+
+    # Background removal (optional)
+    if remove_background:
+        m = max(5, freq.size // 20)
+        bg_inds = np.concatenate((np.arange(m), np.arange(freq.size - m, freq.size)))
+        # Compute raw magnitude and unwrapped phase
+        mag = np.abs(signal)
+        phi = np.unwrap(np.angle(signal))
+        # Fit linear background on log-magnitude and phase
+        p_mag = np.polyfit(freq[bg_inds], np.log(mag[bg_inds]), 1)
+        p_phi = np.polyfit(freq[bg_inds], phi[bg_inds], 1)
+        # Evaluate background over full band
+        mag_bg = np.exp(np.polyval(p_mag, freq))
+        phi_bg = np.polyval(p_phi, freq)
+        # Divide out background
+        signal = signal / (mag_bg * np.exp(1j * phi_bg))
+
     edelay = meta_fit_edelay(freq, signal, rec_depth) if fit_edelay else 0
 
     if resonator_dict[geometry] == reflection and allow_mismatch:
@@ -355,7 +382,6 @@ def _fit_signal_core(
     quick_fit = get_abcd
 
     abcd, _ = quick_fit(freq, corrected_signal, rec_depth)
-
     params = abcd2params(abcd, geometry)
     if not fit_amplitude:
         params = params[:-2]
@@ -368,7 +394,7 @@ def _fit_signal_core(
     if final_ls_opti:
         params, pcov = complex_fit(fit_func, freq, signal, params)
 
-    resonator_params = ResonatorParams(params, geometry, freq, signal)
+    resonator_params = ResonatorParams(params, geometry)
 
     if resonator_params.phi_0 is not None and np.abs(resonator_params.phi_0) > 0.25:
         if not suppress_warnings:
@@ -379,8 +405,7 @@ def _fit_signal_core(
                 UserWarning,
                 stacklevel=2,
             )    # Return FitResult object with covariance matrix information
-    fit_result = FitResult(params, geometry, freq, signal, pcov, fit_func)
-    return fit_result
+    return FitResult(params, geometry, freq, signal, pcov, fit_func, original_signal)
 
 
 def fit_signal(
@@ -394,6 +419,7 @@ def fit_signal(
     rec_depth: int = 1,
     api_warning: bool = True,
     suppress_warnings: bool = False,
+    remove_background: bool = False,
 ) -> Tuple[callable, FitResult]:
     """Fit resonator S-parameter data to extract physical parameters.
 
@@ -428,6 +454,9 @@ def fit_signal(
         If True, show deprecation warning (default: True).
     suppress_warnings : bool, optional
         If True, suppress impedance mismatch warnings (default: False).
+    remove_background : bool, optional
+        If True, remove linear background trends in magnitude and phase
+        using the first and last ~5% of data points (default: True).
 
     Returns
     -------
@@ -436,7 +465,7 @@ def fit_signal(
         - fit_function: Callable that evaluates the fitted model
         - fit_result: FitResult object with parameters, uncertainties,
           and quality metrics
-        
+
         NOTE: This is redundant since fit_result.fit_func contains the same function.
 
     Notes
@@ -465,13 +494,13 @@ def fit_signal(
             "contains the same function.",
             DeprecationWarning,
             stacklevel=2
-        )
-    
+            )
+
     fit_result = _fit_signal_core(
         freq, signal, geometry, fit_amplitude, fit_edelay, 
-        final_ls_opti, allow_mismatch, rec_depth, suppress_warnings
+        final_ls_opti, allow_mismatch, rec_depth, suppress_warnings, remove_background
     )
-    
+
     return fit_result.fit_func, fit_result
 
 def analyze(
@@ -483,6 +512,7 @@ def analyze(
     final_ls_opti: bool = True,
     allow_mismatch: bool = True,
     rec_depth: int = 1,
+    remove_background: bool = False,
 ) -> FitResult:
     """Analyze resonator S-parameter data to extract physical parameters.
 
@@ -513,6 +543,9 @@ def analyze(
         If True, automatically use mismatched models when appropriate (default: True).
     rec_depth : int, optional
         ABCD algorithm recursion depth, 0-2 recommended (default: 1).
+    remove_background : bool, optional
+        If True, remove linear background trends in magnitude and phase
+        using the first and last ~5% of data points (default: True).
 
     Returns
     -------
@@ -551,11 +584,11 @@ def analyze(
     This function provides a clean API without redundancy. The fitted function
     is available as result.fit_func, eliminating the need to return it separately
     as in the deprecated fit_signal() function.
-
     For plotting results, use the .plot() method:
     >>> result.plot(freq, signal)
     """
     return _fit_signal_core(
         freq, signal, geometry, fit_amplitude, fit_edelay,
-        final_ls_opti, allow_mismatch, rec_depth, suppress_warnings=False
+        final_ls_opti, allow_mismatch, rec_depth,
+        suppress_warnings=False, remove_background=remove_background
     )
