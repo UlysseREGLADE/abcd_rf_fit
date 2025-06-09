@@ -297,9 +297,11 @@ def plot(
     arg_ax.grid(alpha=0.3)
     arg_ax.set_ylabel(rf"$\arg({y_axis_str})$ [deg]")
     arg_ax.set_xlabel(f"f [{freq_prefix}Hz]")
-
+    
     fig.align_ylabels([mag_ax, arg_ax])
     if plot_circle:
         fig.align_xlabels([arg_ax, circle_ax])
     
     format_fig(fig)
+    
+    return fig

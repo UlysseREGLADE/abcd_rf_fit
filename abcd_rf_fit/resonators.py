@@ -6,10 +6,12 @@ parameter uncertainties, goodness of fit metrics, and validation functionality.
 """
 
 import json
+from copy import deepcopy
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 
+from .plot import plot
 from .utils import get_prefix_str
 
 
@@ -640,8 +642,12 @@ class FitResult:
                     comparison["recommendation"] = "equivalent_quality"
 
         return comparison
+
     def plot(self, freq: Optional[np.ndarray] = None, signal: Optional[np.ndarray] = None, **kwargs):
         """Plot the fit results with original data.
+
+        When background removal was applied, shows both original signal
+        (with background) and background-corrected signal for comparison.
 
         Parameters
         ----------
@@ -669,22 +675,101 @@ class FitResult:
 
         # Use provided data or fall back to stored data
         freq_to_use = freq if freq is not None else self.freq
-        signal_to_use = signal if signal is not None else self.signal
+
+        # Determine which signal to use for plotting
+        # If signal is provided explicitly, use it
+        # Otherwise, check if background removal was applied
+        if signal is not None:
+            signal_to_use = signal
+            plot_background_removed = False
+        elif self.original_signal is not None and self.signal is not None:
+            # Background removal was applied - show both signals
+            signal_to_use = self.original_signal  # Show original signal as main data
+            plot_background_removed = True
+        else:
+            # Use the fitted signal (could be original or background-corrected)
+            signal_to_use = self.signal
+            plot_background_removed = False
 
         if freq_to_use is None or signal_to_use is None:
-            raise ValueError("No frequency/signal data available for plotting. Provide freq and signal arguments or ensure data was stored during fit.")
+            error_msg = ("No frequency/signal data available for plotting. "
+                        "Provide freq and signal arguments or ensure data "
+                        "was stored during fit.")
+            raise ValueError(error_msg)
 
-        # Calculate fitted signal
+        # Calculate fitted signal using the fitted parameters
         fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
 
-        # Call the plot function with the fit results
+        # Enhanced kwargs to handle background removal visualization
+        plot_kwargs = kwargs.copy()
+        if plot_background_removed:
+            # When background removal was applied, we want to show:
+            # 1. Original signal (with background) as semi-transparent
+            # 2. Background-corrected signal as main signal
+            # 3. Fit based on background-corrected signal
+            
+            # Create the main plot with the background-corrected signal and fit
+            fig = plot(
+                freq_to_use,
+                self.signal,  # Background-corrected signal
+                fit=fitted_signal,  # Show fit for corrected signal
+                params=self.resonator_params,
+                fit_params=self.resonator_params,
+                **plot_kwargs
+            )
+            
+            # Now overlay the original signal (with background) with transparency
+            # Get the axes from the figure
+            axes = fig.get_axes()
+            
+            # Identify the axes (depends on whether circle plot is enabled)
+            circle_ax = None
+            mag_ax = None
+            arg_ax = None
+            
+            for ax in axes:
+                xlabel = ax.get_xlabel()
+                ylabel = ax.get_ylabel()
+                
+                if xlabel == "I" and ylabel == "Q":
+                    circle_ax = ax
+                elif "$|S|$" in ylabel:
+                    mag_ax = ax
+                elif "$\\arg(S)$" in ylabel:
+                    arg_ax = ax
+              # Overlay original signal with transparency
+            from .utils import dB, deg, get_prefix
+            
+            freq_disp, _ = get_prefix(freq_to_use)
+            
+            if circle_ax is not None:
+                circle_ax.scatter(
+                    np.real(signal_to_use), np.imag(signal_to_use),
+                    s=10, facecolors="none", edgecolors="C0", alpha=0.3, zorder=-1
+                )
+            
+            if mag_ax is not None:
+                mag_ax.scatter(
+                    freq_disp, dB(signal_to_use),
+                    s=10, facecolors="none", edgecolors="C0", alpha=0.3, zorder=-1
+                )
+            
+            if arg_ax is not None:
+                arg_ax.scatter(
+                    freq_disp, deg(signal_to_use),
+                    s=10, facecolors="none", edgecolors="C0", alpha=0.3, zorder=-1
+                )
+            
+            return fig
+        
+        # Standard plotting when no background removal
         return plot(
             freq_to_use,
             signal_to_use,
             fit=fitted_signal,
             params=self.resonator_params,
             fit_params=self.resonator_params,
-            **kwargs
+            **plot_kwargs
         )
 
 from copy import deepcopy
