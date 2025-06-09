@@ -674,22 +674,17 @@ class FitResult:
             raise ValueError("No fit function available for plotting")
 
         # Use provided data or fall back to stored data
-        freq_to_use = freq if freq is not None else self.freq
-
-        # Determine which signal to use for plotting
+        freq_to_use = freq if freq is not None else self.freq        # Determine which signal to use for plotting
         # If signal is provided explicitly, use it
         # Otherwise, check if background removal was applied
         if signal is not None:
             signal_to_use = signal
-            plot_background_removed = False
         elif self.original_signal is not None and self.signal is not None:
-            # Background removal was applied - show both signals
-            signal_to_use = self.original_signal  # Show original signal as main data
-            plot_background_removed = True
+            # Background removal was applied - show only background-corrected signal
+            signal_to_use = self.signal  # Use background-corrected signal only
         else:
             # Use the fitted signal (could be original or background-corrected)
             signal_to_use = self.signal
-            plot_background_removed = False
 
         if freq_to_use is None or signal_to_use is None:
             error_msg = ("No frequency/signal data available for plotting. "
@@ -700,80 +695,15 @@ class FitResult:
         # Calculate fitted signal using the fitted parameters
         fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
 
-        # Enhanced kwargs to handle background removal visualization
-        plot_kwargs = kwargs.copy()
-        if plot_background_removed:
-            # When background removal was applied, we want to show:
-            # 1. Original signal (with background) as semi-transparent
-            # 2. Background-corrected signal as main signal
-            # 3. Fit based on background-corrected signal
-            
-            # Create the main plot with the background-corrected signal and fit
-            fig = plot(
-                freq_to_use,
-                self.signal,  # Background-corrected signal
-                fit=fitted_signal,  # Show fit for corrected signal
-                params=self.resonator_params,
-                fit_params=self.resonator_params,
-                **plot_kwargs
-            )
-            
-            # Now overlay the original signal (with background) with transparency
-            # Get the axes from the figure
-            axes = fig.get_axes()
-            
-            # Identify the axes (depends on whether circle plot is enabled)
-            circle_ax = None
-            mag_ax = None
-            arg_ax = None
-            
-            for ax in axes:
-                xlabel = ax.get_xlabel()
-                ylabel = ax.get_ylabel()
-                
-                if xlabel == "I" and ylabel == "Q":
-                    circle_ax = ax
-                elif "$|S|$" in ylabel:
-                    mag_ax = ax
-                elif "$\\arg(S)$" in ylabel:
-                    arg_ax = ax
-              # Overlay original signal with transparency
-            from .utils import dB, deg, get_prefix
-            
-            freq_disp, _ = get_prefix(freq_to_use)
-            
-            if circle_ax is not None:
-                circle_ax.scatter(
-                    np.real(signal_to_use), np.imag(signal_to_use),
-                    s=10, facecolors="none", edgecolors="C0", alpha=0.3, zorder=-1
-                )
-            
-            if mag_ax is not None:
-                mag_ax.scatter(
-                    freq_disp, dB(signal_to_use),
-                    s=10, facecolors="none", edgecolors="C0", alpha=0.3, zorder=-1
-                )
-            
-            if arg_ax is not None:
-                arg_ax.scatter(
-                    freq_disp, deg(signal_to_use),
-                    s=10, facecolors="none", edgecolors="C0", alpha=0.3, zorder=-1
-                )
-            
-            return fig
-        
-        # Standard plotting when no background removal
+        # Standard plotting with background-corrected signal only
         return plot(
             freq_to_use,
             signal_to_use,
             fit=fitted_signal,
             params=self.resonator_params,
             fit_params=self.resonator_params,
-            **plot_kwargs
+            **kwargs
         )
-
-from copy import deepcopy
-from .plot import plot
 
 if __name__ == "__main__":
     from utils import (
