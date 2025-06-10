@@ -3,15 +3,15 @@ import numpy as np
 if __name__ == "__main__":
 
     from utils import (
-        zeros2eps,
         get_prefix_str,
+        zeros2eps,
     )
 
 else:
 
     from .utils import (
-        zeros2eps,
         get_prefix_str,
+        zeros2eps,
     )
 
 
@@ -63,7 +63,7 @@ resonator_dict = {
 }
 
 
-class ResonatorParams(object):
+class ResonatorParams:
     def __init__(self, params, geometry):
 
         self.resonator_func = resonator_dict[geometry]
@@ -106,29 +106,25 @@ class ResonatorParams(object):
     def f_0(self):
         if hasattr(self, "f_0_index"):
             return self.params[self.f_0_index]
-        else:
-            return None
+        return None
 
     @property
     def kappa(self):
         if hasattr(self, "kappa_index"):
             return self.params[self.kappa_index]
-        else:
-            return self.params[self.kappa_i_index] + self.params[self.kappa_c_index]
+        return self.params[self.kappa_i_index] + self.params[self.kappa_c_index]
 
     @property
     def kappa_i(self):
         if hasattr(self, "kappa_i_index"):
             return self.params[self.kappa_i_index]
-        else:
-            return None
+        return None
 
     @property
     def kappa_c(self):
         if hasattr(self, "kappa_c_index"):
             return self.params[self.kappa_c_index]
-        else:
-            return None
+        return None
 
     @property
     def a_in(self):
@@ -136,38 +132,33 @@ class ResonatorParams(object):
             return (
                 self.params[self.re_a_in_index] + 1j * self.params[self.im_a_in_index]
             )
-        else:
-            return None
+        return None
 
     @property
     def re_a_in(self):
         a_in = self.a_in
         if a_in is not None:
             return np.real(a_in)
-        else:
-            return None
+        return None
 
     @property
     def im_a_in(self):
         a_in = self.a_in
         if a_in is not None:
             return np.imag(a_in)
-        else:
-            return None
+        return None
 
     @property
     def edelay(self):
         if hasattr(self, "edelay_index"):
             return self.params[self.edelay_index]
-        else:
-            return None
+        return None
 
     @property
     def phi_0(self):
         if hasattr(self, "phi_0_index"):
             return self.params[self.phi_0_index]
-        else:
-            return None
+        return None
 
     def str(self, latex=False, separator=", ", precision=2, only_f_and_kappa=False, f_precision=2):
 
@@ -207,8 +198,7 @@ class ResonatorParams(object):
 
         if only_f_and_kappa:
             return f_0_str + kappa_str
-        else:
-            return f_0_str + kappa_str + phi_0_str + edelay_str
+        return f_0_str + kappa_str + phi_0_str + edelay_str
 
     def __str__(self) -> str:
 

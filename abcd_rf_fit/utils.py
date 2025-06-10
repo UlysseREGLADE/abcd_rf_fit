@@ -16,17 +16,17 @@ def complex_fit(f, xdata, ydata, p0=None, weights=None, **kwargs):
         weights: Optional weighting in the calculation of the cost function.
         kwargs: passed to the leas_square function
 
-    Returns:
+    Returns
+    -------
         A tuple with the optimal parameters and the covariance matrix
     """
-
     if (np.array(ydata).size - len(p0)) <= 0:
         raise ValueError(
             "yData length should be greater than the number of parameters."
         )
 
     def residuals(params, x, y):
-        """ Computes the residual for the least square algorithm"""
+        """Computes the residual for the least square algorithm"""
         if weights is not None:
             diff = weights * f(x, *params) - y
         else:
@@ -87,17 +87,15 @@ eps = np.finfo(float).eps
 
 
 def zeros2eps(x):
-
     """
     args:
         x: float, complex, or numpy array
-    
+
     return:
         y: numpy array
 
     replace the zeros of a float or numpy array bien the smallest float number
     """
-
     y = np.array(x)
     y[np.abs(y) < eps] = eps
 
@@ -143,12 +141,9 @@ def get_prefix(x):
         index = int(np.log10(max_x) / 3 + 8)
         return (x * 10 ** (-3 * (index - 8)), prefix[index])
 
-    else:
-
-        return (0, "")
+    return (0, "")
 
 
 def get_prefix_str(x, precision=2):
 
-    return "%.{}f %s".format(precision) % get_prefix(x)
-
+    return f"%.{precision}f %s" % get_prefix(x)
