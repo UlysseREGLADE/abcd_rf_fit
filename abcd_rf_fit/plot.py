@@ -1,7 +1,6 @@
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.gridspec import GridSpec
 
 from .utils import dB, deg, get_prefix
 
@@ -238,7 +237,9 @@ def plot(
             center = 0.5 * (xlim[1] + xlim[0])
             delta = 0.5 * (xlim[1] - xlim[0])
             delta /= ratio
-            circle_ax.set_xlim(center-delta, center+delta)        # circle_ax.set_aspect("equal")
+            circle_ax.set_xlim(
+                center - delta, center + delta
+            )  # circle_ax.set_aspect("equal")
         circle_ax.grid(alpha=0.3)
 
     if plot_circle:
@@ -246,7 +247,7 @@ def plot(
     else:
         mag_ax = fig.add_subplot(grid[0, :])
     if title is not None:
-        mag_ax.set_title(title)    # mag_ax.plot(freq_disp, dB(signal), ".C0")
+        mag_ax.set_title(title)  # mag_ax.plot(freq_disp, dB(signal), ".C0")
     mag_ax.scatter(
         freq_disp,
         dB(signal),
@@ -259,8 +260,8 @@ def plot(
         mag_ax.plot(freq_disp, dB(fit), "-C1", label=fit_params_label, zorder=zorder)
 
     if fit_params_label is not None:
-        mag_ax.legend(loc='upper right', framealpha=0.9)
-    
+        mag_ax.legend(loc="upper right", framealpha=0.9)
+
     mag_ax.grid(alpha=0.3)
     mag_ax.set_ylabel(rf"$|{y_axis_str}|$ [dB]")
     mag_ax.xaxis.set_ticklabels([])
@@ -270,7 +271,9 @@ def plot(
     else:
         arg_ax = fig.add_subplot(grid[1, :])
 
-    if corrected_signal is None:        # arg_ax.plot(freq_disp, deg(signal), ".C0", label=params_label)
+    if (
+        corrected_signal is None
+    ):  # arg_ax.plot(freq_disp, deg(signal), ".C0", label=params_label)
         arg_ax.scatter(
             freq_disp,
             deg(signal),
@@ -291,7 +294,7 @@ def plot(
                 facecolors=facecolors,
                 edgecolors="C0",
                 alpha=0.15 * alpha_fit,
-            )        # arg_ax.plot(freq_disp, deg(corrected_signal), ".C0", label=params_label)
+            )  # arg_ax.plot(freq_disp, deg(corrected_signal), ".C0", label=params_label)
         arg_ax.scatter(
             freq_disp,
             deg(corrected_signal),
@@ -323,10 +326,10 @@ def plot(
     arg_ax.grid(alpha=0.3)
     arg_ax.set_ylabel(rf"$\arg({y_axis_str})$ [deg]")
     arg_ax.set_xlabel(f"f [{freq_prefix}Hz]")
-    
+
     fig.align_ylabels([mag_ax, arg_ax])
     if plot_circle:
         fig.align_xlabels([arg_ax, circle_ax])
     format_fig(fig)
-    
+
     return fig
