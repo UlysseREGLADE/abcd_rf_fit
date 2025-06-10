@@ -421,7 +421,7 @@ def fit_signal(
     api_warning: bool = True,
     suppress_warnings: bool = False,
     remove_background: bool = False,
-) -> Tuple[callable, FitResult]:
+) -> Tuple[callable, List[float]]:
     """Fit resonator S-parameter data to extract physical parameters.
 
     **DEPRECATED**: Use analyze() instead for a cleaner API.
@@ -488,7 +488,7 @@ def fit_signal(
     """
     if api_warning:
         warnings.warn(
-            "`fit_signal()` is deprecated. Use `analyze()` instead."
+            "`fit_signal()` is deprecated. Use `analyze()` instead.",
             DeprecationWarning,
             stacklevel=2,
         )
