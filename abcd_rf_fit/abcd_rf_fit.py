@@ -602,6 +602,6 @@ def analyze(
         final_ls_opti,
         allow_mismatch,
         rec_depth,
-        suppress_warnings=False,
+        suppress_warnings=True,
         remove_background=remove_background,
     )
