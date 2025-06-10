@@ -509,7 +509,7 @@ def fit_signal(
         remove_background,
     )
 
-    return fit_result.fit_func, fit_result
+    return fit_result.fit_func, fit_result.params
 
 
 def analyze(
