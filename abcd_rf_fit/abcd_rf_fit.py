@@ -23,6 +23,7 @@ Typical usage:
 """
 
 import warnings
+warnings.filterwarnings("always")
 from typing import List, Tuple
 
 import numpy as np
@@ -423,9 +424,7 @@ def fit_signal(
 ) -> Tuple[callable, FitResult]:
     """Fit resonator S-parameter data to extract physical parameters.
 
-    **DEPRECATED**: This function returns a redundant tuple (fit_func, FitResult)
-    where FitResult.fit_func already contains the same function.
-    Use analyze() instead for a cleaner API.
+    **DEPRECATED**: Use analyze() instead for a cleaner API.
 
     Parameters
     ----------
@@ -470,7 +469,7 @@ def fit_signal(
 
     Notes
     -----
-    **DEPRECATED**: Use analyze() instead which returns only FitResult.
+    **DEPRECATED**: Use analyze() instead which returns FitResult.
     The FitResult object provides access to:
     - Parameter values and uncertainties (if final_ls_opti=True)
     - Goodness of fit metrics (R², reduced χ², RMS residual)
@@ -489,9 +488,7 @@ def fit_signal(
     """
     if api_warning:
         warnings.warn(
-            "fit_signal() is deprecated due to API redundancy. Use analyze() instead. "
-            "fit_signal() returns (fit_func, FitResult) but FitResult.fit_func already "
-            "contains the same function.",
+            "`fit_signal()` is deprecated. Use `analyze()` instead."
             DeprecationWarning,
             stacklevel=2,
         )
