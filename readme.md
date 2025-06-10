@@ -337,3 +337,11 @@ $$
 
 
 This simple method proves to be really efficient.
+
+## Contributing
+
+Before you commit, run:
+```
+black .
+ruff check . --fix
+```
