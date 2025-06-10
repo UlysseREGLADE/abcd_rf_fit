@@ -348,7 +348,7 @@ def _fit_signal_core(
     Parameters
     ----------
     remove_background : bool, optional
-        If True, remove linear background trends in magnitude and phase 
+        If True, remove linear background trends in magnitude and phase
         using the first and last ~5% of data points (default: True).
     """
     # Store original signal for FitResult
@@ -404,7 +404,7 @@ def _fit_signal_core(
                 "affected, you can try to set: allow_mismatch=False",
                 UserWarning,
                 stacklevel=2,
-            )    # Return FitResult object with covariance matrix information
+            )  # Return FitResult object with covariance matrix information
     return FitResult(params, geometry, freq, signal, pcov, fit_func, original_signal)
 
 
@@ -424,7 +424,7 @@ def fit_signal(
     """Fit resonator S-parameter data to extract physical parameters.
 
     **DEPRECATED**: This function returns a redundant tuple (fit_func, FitResult)
-    where FitResult.fit_func already contains the same function. 
+    where FitResult.fit_func already contains the same function.
     Use analyze() instead for a cleaner API.
 
     Parameters
@@ -482,7 +482,7 @@ def fit_signal(
     --------
     >>> # OLD (deprecated):
     >>> fit_func, result = fit_signal(freq, s21_data, "transmission")
-    >>> 
+    >>>
     >>> # NEW (recommended):
     >>> result = analyze(freq, s21_data, "transmission")
     >>> fit_func = result.fit_func  # Same function available as attribute
@@ -493,15 +493,24 @@ def fit_signal(
             "fit_signal() returns (fit_func, FitResult) but FitResult.fit_func already "
             "contains the same function.",
             DeprecationWarning,
-            stacklevel=2
-            )
+            stacklevel=2,
+        )
 
     fit_result = _fit_signal_core(
-        freq, signal, geometry, fit_amplitude, fit_edelay, 
-        final_ls_opti, allow_mismatch, rec_depth, suppress_warnings, remove_background
+        freq,
+        signal,
+        geometry,
+        fit_amplitude,
+        fit_edelay,
+        final_ls_opti,
+        allow_mismatch,
+        rec_depth,
+        suppress_warnings,
+        remove_background,
     )
 
     return fit_result.fit_func, fit_result
+
 
 def analyze(
     freq: np.ndarray,
@@ -564,18 +573,18 @@ def analyze(
     >>> result = analyze(freq, s21_data, "transmission")
     >>> print(f"f₀ = {result.f_0:.6e} Hz")
     >>> print(f"Q = {result.f_0/result.kappa:.1f}")
-    >>> 
+    >>>
     >>> # Access uncertainties
     >>> f0_error = result.get_param_error('f_0')
     >>> print(f"f₀ = {result.f_0:.6e} ± {f0_error:.2e} Hz")
-    >>> 
+    >>>
     >>> # Evaluate fit function
     >>> fitted_signal = result.fit_func(freq, *result.params.params)
-    >>> 
+    >>>
     >>> # Validate fit quality
     >>> validation = result.validate_fit(freq, s21_data)
     >>> print(f"Fit status: {validation['status']}")
-    >>> 
+    >>>
     >>> # Save results
     >>> result.save_to_file('my_fit_results.json')
 
@@ -588,7 +597,14 @@ def analyze(
     >>> result.plot(freq, signal)
     """
     return _fit_signal_core(
-        freq, signal, geometry, fit_amplitude, fit_edelay,
-        final_ls_opti, allow_mismatch, rec_depth,
-        suppress_warnings=False, remove_background=remove_background
+        freq,
+        signal,
+        geometry,
+        fit_amplitude,
+        fit_edelay,
+        final_ls_opti,
+        allow_mismatch,
+        rec_depth,
+        suppress_warnings=False,
+        remove_background=remove_background,
     )

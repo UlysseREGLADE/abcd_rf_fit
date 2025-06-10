@@ -84,7 +84,9 @@ class FitResult:
         self.resonator_params = ResonatorParams(params, geometry)
         self.freq = freq
         self.signal = signal  # Background-corrected signal used for fitting
-        self.original_signal = original_signal  # Original signal before background removal
+        self.original_signal = (
+            original_signal  # Original signal before background removal
+        )
         self.pcov = pcov
         self.fit_func = fit_func
 
@@ -241,8 +243,12 @@ class FitResult:
 
         # Check if we have data for validation
         if self.freq is None or self.signal is None:
-            validation["warnings"].append("No frequency/signal data available for validation")
-            validation["recommendations"].append("Store freq and signal data during fit for comprehensive validation")
+            validation["warnings"].append(
+                "No frequency/signal data available for validation"
+            )
+            validation["recommendations"].append(
+                "Store freq and signal data during fit for comprehensive validation"
+            )
             validation["status"] = "limited"
             return validation
 
@@ -269,7 +275,7 @@ class FitResult:
                         )
                         validation["recommendations"].append(
                             f"Consider more data points or lower noise for better {param_name} determination"
-                        )        # 2. Goodness of fit validation
+                        )  # 2. Goodness of fit validation
         gof = self.goodness_of_fit()
         if gof is not None:
             validation["metrics"].update(gof)
@@ -315,7 +321,7 @@ class FitResult:
                         )
                         validation["recommendations"].append(
                             "High parameter correlation may indicate overparameterization"
-                        )        # 4. Physical parameter validation
+                        )  # 4. Physical parameter validation
         # Check if parameters are within reasonable ranges
         if self.resonator_params.f_0 is not None:
             freq_range = self.freq[-1] - self.freq[0]
@@ -357,7 +363,7 @@ class FitResult:
 
     def to_dict(self):
         """Export fit results to dictionary for saving/serialization.
-        
+
         Returns a comprehensive dictionary with named parameters, their values,
         uncertainties, and all fit quality information.
         """
@@ -367,21 +373,31 @@ class FitResult:
             if self.resonator_params.resonator_func == func:
                 geometry = geom
                 break
-          # Create structured parameter dictionary with names, values, and errors
+        # Create structured parameter dictionary with names, values, and errors
         parameters = {}
-        param_names = ['f_0', 'kappa', 'kappa_i', 'kappa_c', 'edelay', 'phi_0', 'Q', 'Q_i', 'Q_c']
-        
+        param_names = [
+            "f_0",
+            "kappa",
+            "kappa_i",
+            "kappa_c",
+            "edelay",
+            "phi_0",
+            "Q",
+            "Q_i",
+            "Q_c",
+        ]
+
         for param_name in param_names:
             param_value = getattr(self.resonator_params, param_name, None)
             if param_value is not None:
                 param_error = self.get_param_error(param_name)
-                
+
                 # Handle complex numbers for JSON serialization
                 if isinstance(param_value, complex):
                     serializable_value = {
-                        'real': float(param_value.real),
-                        'imag': float(param_value.imag),
-                        '_type': 'complex'
+                        "real": float(param_value.real),
+                        "imag": float(param_value.imag),
+                        "_type": "complex",
                     }
                 elif isinstance(param_value, np.ndarray):
                     serializable_value = param_value.tolist()
@@ -389,35 +405,63 @@ class FitResult:
                     serializable_value = float(param_value)
                 else:
                     serializable_value = param_value
-                
+
                 parameters[param_name] = {
-                    'value': serializable_value,
-                    'error': float(param_error) if param_error is not None else None,
-                    'relative_error': float(abs(param_error / param_value)) if param_error is not None and param_value != 0 else None
+                    "value": serializable_value,
+                    "error": float(param_error) if param_error is not None else None,
+                    "relative_error": (
+                        float(abs(param_error / param_value))
+                        if param_error is not None and param_value != 0
+                        else None
+                    ),
                 }
-        
+
         # Build comprehensive result dictionary
         result_dict = {
             # High-level summary
-            'geometry': geometry,
-            'fit_summary': self._get_fit_summary(),
-            
+            "geometry": geometry,
+            "fit_summary": self._get_fit_summary(),
             # Structured parameters with names, values, and uncertainties
-            'parameters': parameters,
-              # Raw arrays for compatibility
-            'raw_data': {
-                'fitted_params': [float(x) if not isinstance(x, complex) else {'real': float(x.real), 'imag': float(x.imag), '_type': 'complex'} for x in self.resonator_params.params],
-                'param_errors': [float(x) for x in self.param_errors.tolist()] if self.param_errors is not None else None,
-                'covariance_matrix': [[float(x) for x in row] for row in self.pcov.tolist()] if self.pcov is not None else None,
-                'correlation_matrix': [[float(x) for x in row] for row in self.correlation_matrix.tolist()] if self.correlation_matrix is not None else None,
+            "parameters": parameters,
+            # Raw arrays for compatibility
+            "raw_data": {
+                "fitted_params": [
+                    (
+                        float(x)
+                        if not isinstance(x, complex)
+                        else {
+                            "real": float(x.real),
+                            "imag": float(x.imag),
+                            "_type": "complex",
+                        }
+                    )
+                    for x in self.resonator_params.params
+                ],
+                "param_errors": (
+                    [float(x) for x in self.param_errors.tolist()]
+                    if self.param_errors is not None
+                    else None
+                ),
+                "covariance_matrix": (
+                    [[float(x) for x in row] for row in self.pcov.tolist()]
+                    if self.pcov is not None
+                    else None
+                ),
+                "correlation_matrix": (
+                    [
+                        [float(x) for x in row]
+                        for row in self.correlation_matrix.tolist()
+                    ]
+                    if self.correlation_matrix is not None
+                    else None
+                ),
             },
-            
             # Metadata
-            'metadata': {
-                'parameter_count': len(self.resonator_params.params),
-                'has_uncertainties': self.param_errors is not None,
-                'has_covariance': self.pcov is not None,
-            }
+            "metadata": {
+                "parameter_count": len(self.resonator_params.params),
+                "has_uncertainties": self.param_errors is not None,
+                "has_covariance": self.pcov is not None,
+            },
         }
 
         return result_dict
@@ -425,69 +469,69 @@ class FitResult:
     def _get_fit_summary(self):
         """Generate a human-readable summary of the fit results."""
         summary = {
-            'geometry': None,
-            'resonance_frequency': None,
-            'quality_factor': None,
-            'linewidth': None,
-            'coupling_rates': {},
+            "geometry": None,
+            "resonance_frequency": None,
+            "quality_factor": None,
+            "linewidth": None,
+            "coupling_rates": {},
         }
-        
+
         # Get geometry name
         for geom, func in resonator_dict.items():
             if self.resonator_params.resonator_func == func:
-                summary['geometry'] = geom
+                summary["geometry"] = geom
                 break
-        
+
         # Add main parameters with proper units and formatting
         if self.resonator_params.f_0 is not None:
-            f0_error = self.get_param_error('f_0')
-            summary['resonance_frequency'] = {
-                'value_hz': self.resonator_params.f_0,
-                'error_hz': f0_error,
-                'formatted': f"{get_prefix_str(self.resonator_params.f_0, 5)}Hz"
+            f0_error = self.get_param_error("f_0")
+            summary["resonance_frequency"] = {
+                "value_hz": self.resonator_params.f_0,
+                "error_hz": f0_error,
+                "formatted": f"{get_prefix_str(self.resonator_params.f_0, 5)}Hz",
             }
-        
+
         if self.resonator_params.Q is not None:
-            summary['quality_factor'] = {
-                'total_q': self.resonator_params.Q,
-                'q_internal': self.resonator_params.Q_i,
-                'q_coupling': self.resonator_params.Q_c,
+            summary["quality_factor"] = {
+                "total_q": self.resonator_params.Q,
+                "q_internal": self.resonator_params.Q_i,
+                "q_coupling": self.resonator_params.Q_c,
             }
-        
+
         if self.resonator_params.kappa is not None:
-            kappa_error = self.get_param_error('kappa')
-            summary['linewidth'] = {
-                'value_hz': self.resonator_params.kappa,
-                'error_hz': kappa_error,
-                'formatted': f"{get_prefix_str(self.resonator_params.kappa, 3)}Hz"
+            kappa_error = self.get_param_error("kappa")
+            summary["linewidth"] = {
+                "value_hz": self.resonator_params.kappa,
+                "error_hz": kappa_error,
+                "formatted": f"{get_prefix_str(self.resonator_params.kappa, 3)}Hz",
             }
-        
+
         if self.resonator_params.kappa_i is not None:
-            summary['coupling_rates']['internal'] = {
-                'value_hz': self.resonator_params.kappa_i,
-                'formatted': f"{get_prefix_str(self.resonator_params.kappa_i, 3)}Hz"
+            summary["coupling_rates"]["internal"] = {
+                "value_hz": self.resonator_params.kappa_i,
+                "formatted": f"{get_prefix_str(self.resonator_params.kappa_i, 3)}Hz",
             }
-        
+
         if self.resonator_params.kappa_c is not None:
-            summary['coupling_rates']['external'] = {
-                'value_hz': self.resonator_params.kappa_c,
-                'formatted': f"{get_prefix_str(self.resonator_params.kappa_c, 3)}Hz"
+            summary["coupling_rates"]["external"] = {
+                "value_hz": self.resonator_params.kappa_c,
+                "formatted": f"{get_prefix_str(self.resonator_params.kappa_c, 3)}Hz",
             }
-        
+
         if self.resonator_params.phi_0 is not None:
-            summary['phase_offset'] = {
-                'value_rad': self.resonator_params.phi_0,
-                'value_deg': self.resonator_params.phi_0 * 180 / np.pi,
-                'error_rad': self.get_param_error('phi_0'),
+            summary["phase_offset"] = {
+                "value_rad": self.resonator_params.phi_0,
+                "value_deg": self.resonator_params.phi_0 * 180 / np.pi,
+                "error_rad": self.get_param_error("phi_0"),
             }
-        
+
         if self.resonator_params.edelay is not None:
-            summary['electrical_delay'] = {
-                'value_s': self.resonator_params.edelay,
-                'error_s': self.get_param_error('edelay'),
-                'formatted': f"{get_prefix_str(self.resonator_params.edelay, 3)}s"
+            summary["electrical_delay"] = {
+                "value_s": self.resonator_params.edelay,
+                "error_s": self.get_param_error("edelay"),
+                "formatted": f"{get_prefix_str(self.resonator_params.edelay, 3)}s",
             }
-        
+
         return summary
 
     def save_to_file(self, filename):
@@ -557,7 +601,13 @@ class FitResult:
             )
 
         return cls(params, geometry, pcov=pcov)
-    def compare_with(self, other_fit_result, freq: Optional[np.ndarray] = None, signal: Optional[np.ndarray] = None):
+
+    def compare_with(
+        self,
+        other_fit_result,
+        freq: Optional[np.ndarray] = None,
+        signal: Optional[np.ndarray] = None,
+    ):
         """
         Compare this fit result with another fit result.
 
@@ -643,7 +693,12 @@ class FitResult:
 
         return comparison
 
-    def plot(self, freq: Optional[np.ndarray] = None, signal: Optional[np.ndarray] = None, **kwargs):
+    def plot(
+        self,
+        freq: Optional[np.ndarray] = None,
+        signal: Optional[np.ndarray] = None,
+        **kwargs,
+    ):
         """Plot the fit results with original data.
 
         When background removal was applied, shows both original signal
@@ -674,7 +729,9 @@ class FitResult:
             raise ValueError("No fit function available for plotting")
 
         # Use provided data or fall back to stored data
-        freq_to_use = freq if freq is not None else self.freq        # Determine which signal to use for plotting
+        freq_to_use = (
+            freq if freq is not None else self.freq
+        )  # Determine which signal to use for plotting
         # If signal is provided explicitly, use it
         # Otherwise, check if background removal was applied
         if signal is not None:
@@ -687,9 +744,11 @@ class FitResult:
             signal_to_use = self.signal
 
         if freq_to_use is None or signal_to_use is None:
-            error_msg = ("No frequency/signal data available for plotting. "
-                        "Provide freq and signal arguments or ensure data "
-                        "was stored during fit.")
+            error_msg = (
+                "No frequency/signal data available for plotting. "
+                "Provide freq and signal arguments or ensure data "
+                "was stored during fit."
+            )
             raise ValueError(error_msg)
 
         # Calculate fitted signal using the fitted parameters
@@ -702,8 +761,9 @@ class FitResult:
             fit=fitted_signal,
             params=self.resonator_params,
             fit_params=self.resonator_params,
-            **kwargs
+            **kwargs,
         )
+
 
 if __name__ == "__main__":
     from utils import (
@@ -746,6 +806,7 @@ def hanger(freq, f_0, kappa, kappa_c_real, phi_0=0):
 def hanger_mismatched(freq, f_0, kappa, kappa_c_real, phi_0):
     return hanger(freq, f_0, kappa, kappa_c_real, phi_0)
 
+
 resonator_dict = {
     "transmission": transmission,
     "t": transmission,
@@ -759,6 +820,7 @@ resonator_dict = {
     "hm": hanger_mismatched,
 }
 
+
 def get_fit_function(geometry, amplitude=True, edelay=True):
     if type(geometry) == str:
         resonator_func = resonator_dict[geometry]
@@ -768,19 +830,22 @@ def get_fit_function(geometry, amplitude=True, edelay=True):
     if not amplitude and not edelay:
         return resonator_func
 
-    elif amplitude and not edelay:
+    if amplitude and not edelay:
+
         def fit_func(*args):
             return resonator_func(*args[:-2]) * (args[-2] + 1j * args[-1])
 
         return fit_func
 
-    elif not amplitude and edelay:
+    if not amplitude and edelay:
+
         def fit_func(*args):
             return resonator_func(*args[:-1]) * np.exp(2j * np.pi * args[-1] * args[0])
 
         return fit_func
 
-    elif amplitude and edelay:
+    if amplitude and edelay:
+
         def fit_func(*args):
             return (
                 resonator_func(*args[:-3])
@@ -790,9 +855,8 @@ def get_fit_function(geometry, amplitude=True, edelay=True):
 
         return fit_func
 
-    else:
+    raise Exception("Unreachable")
 
-        raise Exception("Unreachable")
 
 class ResonatorParams:
     """Container for resonator parameters with geometry-specific access methods.
@@ -836,7 +900,7 @@ class ResonatorParams:
         Index of electrical delay parameter.
     """
 
-    def __init__(self, params: List[float], geometry: str, freq = None, signal = None):
+    def __init__(self, params: List[float], geometry: str, freq=None, signal=None):
         self.resonator_func = resonator_dict[geometry]
         self.params = params
 
@@ -1072,7 +1136,7 @@ class ResonatorParams:
         precision=2,
         only_f_and_kappa=False,
         f_precision=5,
-        red_warning = False
+        red_warning=False,
     ):
         """Generate formatted string representation of resonator parameters.
 
@@ -1115,7 +1179,7 @@ class ResonatorParams:
         if self.resonator_func in [hanger_mismatched, reflection_mismatched]:
             if red_warning and self.phi_0 is not None and np.abs(self.phi_0) > 0.25:
                 phi_0_str = r"%s = %0.2f rad" % (phi_0[latex], self.phi_0)
-                phi_0_str = "%s/!\\ "%separator + phi_0_str + " /!\\"
+                phi_0_str = "%s/!\\ " % separator + phi_0_str + " /!\\"
             else:
                 phi_0_str = rf"{separator}{phi_0[latex]} = {self.phi_0:0.2f} rad"
         else:
@@ -1129,6 +1193,7 @@ class ResonatorParams:
 
     def __str__(self) -> str:
         """Return string representation of resonator parameters.
+
         Returns
         -------
         str
@@ -1138,6 +1203,7 @@ class ResonatorParams:
 
     def __repr__(self):
         """Return unambiguous string representation of resonator parameters.
+
         Returns
         -------
         str
@@ -1153,33 +1219,32 @@ class ResonatorParams:
 
         if len(args) == 0 and len(kwargs) == 0:
             params = self.params
+        elif len(kwargs) == 0:
+            params = np.copy(self.params)
+            params[: len(args)] = args
         else:
-            if len(kwargs) == 0:
-                params = np.copy(self.params)
-                params[:len(args)] = args
-            else:
-                resonator = deepcopy(self)
-                for key in kwargs:
-                    resonator.params[resonator.__dict__[key + "_index"]] = kwargs[key]
-                resonator.params[:len(args)] = args
-                params = resonator.params
-        
+            resonator = deepcopy(self)
+            for key in kwargs:
+                resonator.params[resonator.__dict__[key + "_index"]] = kwargs[key]
+            resonator.params[: len(args)] = args
+            params = resonator.params
+
         return fit_func(freq, *params)
-    
+
     def plot(
-            self,
-            fig = None,
-            plot_not_corrected = True,
-            font_size = None,
-            plot_circle = True,
-            center_freq = False,
-            only_f_and_kappa = False,
-            precision = 2,
-            alpha_fit = 1.0,
-            style = 'Normal',
-            title = None,
-            params = None,
-        ):
+        self,
+        fig=None,
+        plot_not_corrected=True,
+        font_size=None,
+        plot_circle=True,
+        center_freq=False,
+        only_f_and_kappa=False,
+        precision=2,
+        alpha_fit=1.0,
+        style="Normal",
+        title=None,
+        params=None,
+    ):
         plot(
             self.freq,
             self.signal,
@@ -1195,7 +1260,7 @@ class ResonatorParams:
             precision=precision,
             alpha_fit=alpha_fit,
             style=style,
-            title=title
+            title=title,
         )
 
 

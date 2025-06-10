@@ -5,28 +5,34 @@ from matplotlib.gridspec import GridSpec
 
 from .utils import dB, deg, get_prefix
 
-cm = 1/2.54  # centimeters in inches
-column_width = 12.4*cm
+cm = 1 / 2.54  # centimeters in inches
+column_width = 12.4 * cm
+
 
 def get_ax_ratio(ax):
-    bbox = ax.get_window_extent().transformed(ax.get_figure().dpi_scale_trans.inverted())
+    bbox = ax.get_window_extent().transformed(
+        ax.get_figure().dpi_scale_trans.inverted()
+    )
     screen_width, screen_height = bbox.width, bbox.height
-    
+
     x_lim = np.abs(np.diff(ax.get_xlim())[0])
     y_lim = np.abs(np.diff(ax.get_ylim())[0])
 
-    return (screen_height/screen_width)*(x_lim/y_lim)
+    return (screen_height / screen_width) * (x_lim / y_lim)
 
-def grid_spec_inches(fig,
-                 width_ratios=(1,),
-                 height_ratios=(1,),
-                 left=1.2*cm,
-                 right=1.2*cm,
-                 bottom=1.2*cm,
-                 top=0.0,
-                 wspace=0.2*cm,
-                 hspace=0.2*cm):
-    
+
+def grid_spec_inches(
+    fig,
+    width_ratios=(1,),
+    height_ratios=(1,),
+    left=1.2 * cm,
+    right=1.2 * cm,
+    bottom=1.2 * cm,
+    top=0.0,
+    wspace=0.2 * cm,
+    hspace=0.2 * cm,
+):
+
     if type(width_ratios) in (int, float):
         width_ratios = [width_ratios]
     if type(height_ratios) in (int, float):
@@ -35,45 +41,58 @@ def grid_spec_inches(fig,
     fig_width = fig.get_size_inches()[0]
     fig_height = fig.get_size_inches()[1]
 
-    avg_width = (fig_width-right-left-(len(width_ratios)-1)*wspace)/len(width_ratios)
-    wspace = wspace/avg_width
-    left = left/fig_width
-    right = 1-(right/fig_width)
+    avg_width = (fig_width - right - left - (len(width_ratios) - 1) * wspace) / len(
+        width_ratios
+    )
+    wspace = wspace / avg_width
+    left = left / fig_width
+    right = 1 - (right / fig_width)
 
-    avg_height = (fig_height-top-bottom-(len(height_ratios)-1)*hspace)/len(height_ratios)
-    hspace = hspace/avg_height
-    bottom = bottom/fig_height
-    top = 1-(top/fig_height)
+    avg_height = (fig_height - top - bottom - (len(height_ratios) - 1) * hspace) / len(
+        height_ratios
+    )
+    hspace = hspace / avg_height
+    bottom = bottom / fig_height
+    top = 1 - (top / fig_height)
 
-    return fig.add_gridspec(len(height_ratios),
-                            len(width_ratios),
-                            width_ratios=width_ratios,
-                            height_ratios=height_ratios,
-                            left=left,
-                            right=right,
-                            bottom=bottom,
-                            top=top,
-                            wspace=wspace,
-                            hspace=hspace)
+    return fig.add_gridspec(
+        len(height_ratios),
+        len(width_ratios),
+        width_ratios=width_ratios,
+        height_ratios=height_ratios,
+        left=left,
+        right=right,
+        bottom=bottom,
+        top=top,
+        wspace=wspace,
+        hspace=hspace,
+    )
 
-def format_fig(fig, ignored_axes=None, cbar_axes = None):
+
+def format_fig(fig, ignored_axes=None, cbar_axes=None):
     if ignored_axes is None:
         ignored_axes = []
     if cbar_axes is None:
         cbar_axes = []
-    
+
     for ax in fig.axes:
         if ax not in ignored_axes:
-            if not ax in cbar_axes:
-                ax.tick_params(direction='in', which='both', color=[0, 0, 0, 0.5], colors=[0, 0, 0, 0.75])
-                ax.yaxis.set_ticks_position('both')
-                ax.xaxis.set_ticks_position('both')
+            if ax not in cbar_axes:
+                ax.tick_params(
+                    direction="in",
+                    which="both",
+                    color=[0, 0, 0, 0.5],
+                    colors=[0, 0, 0, 0.75],
+                )
+                ax.yaxis.set_ticks_position("both")
+                ax.xaxis.set_ticks_position("both")
             else:
-                ax.tick_params(direction='in', color=[0, 0, 0, 0])
-            
+                ax.tick_params(direction="in", color=[0, 0, 0, 0])
+
             for spine in ax.spines.values():
-                spine.set_edgecolor('black')
+                spine.set_edgecolor("black")
                 spine.set_alpha(0.25)
+
 
 def plot(
     freq,
@@ -98,14 +117,14 @@ def plot(
             corrected_fit = fit * np.exp(-2j * np.pi * freq * fit_params.edelay)
     else:
         corrected_signal = None
-    
+
     # y_axis_str = r'S_{11}'
     # if fit_params is not None:
     #     if fit_params.resonator_func == resonator_dict['t']:
     #         y_axis_str = r'S_{21}'
-    
-    y_axis_str = r'S'
-    
+
+    y_axis_str = r"S"
+
     if center_freq:
         freq = freq - fit_params.f_0
 
@@ -144,11 +163,19 @@ def plot(
         fit_params_label = None
 
     # fig = fig or plt.figure(figsize=(18, 6))
-    fig = fig or plt.figure(figsize=(21*cm, 8.5*cm))
+    fig = fig or plt.figure(figsize=(21 * cm, 8.5 * cm))
 
     # grid = GridSpec(2, 2, fig, wspace=0.2, hspace=0.3, width_ratios=[1.5, 1], left=0.3)
     width_ratios = (2.1, 1)
-    grid = grid_spec_inches(fig, width_ratios=width_ratios, height_ratios=(1, 1), left=2.1*cm, right=2.1*cm, top=1.8*cm, bottom=1.1*cm)
+    grid = grid_spec_inches(
+        fig,
+        width_ratios=width_ratios,
+        height_ratios=(1, 1),
+        left=2.1 * cm,
+        right=2.1 * cm,
+        top=1.8 * cm,
+        bottom=1.1 * cm,
+    )
 
     if plot_circle:
         circle_ax = fig.add_subplot(grid[:, 1])
@@ -196,20 +223,20 @@ def plot(
 
         circle_ax.plot(0, 0, "+C3")
         circle_ax.set_xlabel("I")
-        circle_ax.yaxis.set_label_position('right')
-        circle_ax.yaxis.set_ticks_position('right')
+        circle_ax.yaxis.set_label_position("right")
+        circle_ax.yaxis.set_ticks_position("right")
         circle_ax.set_ylabel("Q")
         ratio = get_ax_ratio(circle_ax)
         if ratio > 1:
             ylim = circle_ax.get_ylim()
-            center = 0.5*(ylim[1] + ylim[0])
-            delta = 0.5*(ylim[1] - ylim[0])
+            center = 0.5 * (ylim[1] + ylim[0])
+            delta = 0.5 * (ylim[1] - ylim[0])
             delta *= ratio
-            circle_ax.set_ylim(center-delta, center+delta)
+            circle_ax.set_ylim(center - delta, center + delta)
         else:
             xlim = circle_ax.get_xlim()
-            center = 0.5*(xlim[1] + xlim[0])
-            delta = 0.5*(xlim[1] - xlim[0])
+            center = 0.5 * (xlim[1] + xlim[0])
+            delta = 0.5 * (xlim[1] - xlim[0])
             delta /= ratio
             circle_ax.set_xlim(center-delta, center+delta)        # circle_ax.set_aspect("equal")
         circle_ax.grid(alpha=0.3)
@@ -218,7 +245,6 @@ def plot(
         mag_ax = fig.add_subplot(grid[0, 0])
     else:
         mag_ax = fig.add_subplot(grid[0, :])
-    
     if title is not None:
         mag_ax.set_title(title)    # mag_ax.plot(freq_disp, dB(signal), ".C0")
     mag_ax.scatter(
@@ -301,7 +327,6 @@ def plot(
     fig.align_ylabels([mag_ax, arg_ax])
     if plot_circle:
         fig.align_xlabels([arg_ax, circle_ax])
-    
     format_fig(fig)
     
     return fig
