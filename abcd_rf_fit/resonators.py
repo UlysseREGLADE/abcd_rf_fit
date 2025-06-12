@@ -114,7 +114,6 @@ class FitResult:
         if self.pcov is not None:
             return np.sqrt(np.diag(self.pcov))
         return None
-
     @property
     def correlation_matrix(self) -> Optional[np.ndarray]:
         """Calculate correlation matrix from covariance matrix.
@@ -128,6 +127,55 @@ class FitResult:
             std_devs = np.sqrt(np.diag(self.pcov))
             return self.pcov / np.outer(std_devs, std_devs)
         return None
+
+    @property
+    def r_squared(self) -> Optional[float]:
+        """Direct access to R-squared value.
+
+        Returns
+        -------
+        float or None
+            R-squared coefficient of determination (0-1, higher is better),
+            or None if fit function or data is not available.        """
+        gof = self.goodness_of_fit()
+        return gof["r_squared"] if gof is not None else None
+
+    def is_valid_for_plotting(
+        self,
+        min_r_squared: float = 0.8,
+        freq_range: Optional[tuple] = None
+    ) -> bool:
+        """
+        Determine if this fit is valid enough for plotting with fit overlay.
+        
+        Parameters
+        ----------
+        min_r_squared : float
+            Minimum R² threshold for valid fit (default: 0.8)
+        freq_range : tuple, optional
+            (freq_min, freq_max) range. If provided, checks if f_0 is within range.
+            If not provided, uses stored frequency array if available.
+            
+        Returns
+        -------
+        bool
+            True if fit is valid for plotting with overlay
+        """
+        # Check R² threshold
+        r_squared_valid = self.r_squared is not None and self.r_squared >= min_r_squared
+        
+        # Check frequency range
+        freq_in_range = True
+        if freq_range is not None:
+            freq_min, freq_max = freq_range
+            if self.resonator_params.f_0 is not None:
+                freq_in_range = freq_min <= self.resonator_params.f_0 <= freq_max
+        elif self.freq is not None and self.resonator_params.f_0 is not None:
+            # Use stored frequency array if no range provided
+            freq_min, freq_max = self.freq.min(), self.freq.max()
+            freq_in_range = freq_min <= self.resonator_params.f_0 <= freq_max
+        
+        return r_squared_valid and freq_in_range
 
     def get_param_error(self, param_name: str) -> Optional[float]:
         """Get uncertainty for a specific parameter.
@@ -697,12 +745,18 @@ class FitResult:
         self,
         freq: Optional[np.ndarray] = None,
         signal: Optional[np.ndarray] = None,
+        auto_validate: bool = True,
+        min_r_squared: float = 0.8,
+        freq_range: Optional[tuple] = None,
         **kwargs,
     ):
-        """Plot the fit results with original data.
+        """Plot the fit results with original data and automatic fit validation.
 
         When background removal was applied, shows both original signal
         (with background) and background-corrected signal for comparison.
+        
+        If auto_validate is enabled, automatically determines whether to show
+        fit overlay based on fit quality (R² threshold and frequency range validation).
 
         Parameters
         ----------
@@ -710,6 +764,15 @@ class FitResult:
             Frequency array used in the fit. If not provided, uses stored data.
         signal : np.ndarray, optional
             Original signal data that was fitted. If not provided, uses stored data.
+        auto_validate : bool, optional
+            If True, automatically validate fit quality and only show fit overlay
+            for valid fits. If False, always show fit overlay. Default is True.
+        min_r_squared : float, optional
+            Minimum R² threshold for automatic validation (default: 0.8).
+            Only used when auto_validate=True.
+        freq_range : tuple, optional
+            (freq_min, freq_max) for frequency range validation.
+            Only used when auto_validate=True.
         **kwargs
             Additional arguments passed to the plot function.
 
@@ -721,8 +784,9 @@ class FitResult:
         Examples
         --------
         >>> result = analyze(freq, signal, "transmission")
-        >>> fig = result.plot()  # Uses stored data
-        >>> fig = result.plot(freq, signal)  # Uses provided data
+        >>> fig = result.plot()  # Auto-validates and shows fit if valid
+        >>> fig = result.plot(auto_validate=False)  # Always shows fit
+        >>> fig = result.plot(min_r_squared=0.9)  # Stricter validation
         >>> fig.show()
         """
         if self.fit_func is None:
@@ -751,14 +815,31 @@ class FitResult:
             )
             raise ValueError(error_msg)
 
-        # Calculate fitted signal using the fitted parameters
-        fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
+        # Automatic fit validation logic
+        if auto_validate:
+            # Check if fit is valid for plotting with overlay
+            is_valid = self.is_valid_for_plotting(
+                min_r_squared=min_r_squared,
+                freq_range=freq_range
+            )
+            
+            if is_valid:
+                # Calculate fitted signal for valid fits
+                fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
+                fit_overlay = fitted_signal
+            else:
+                # Don't show fit overlay for invalid fits
+                fit_overlay = None
+        else:
+            # Always calculate fitted signal when auto_validate is disabled
+            fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
+            fit_overlay = fitted_signal
 
-        # Standard plotting with background-corrected signal only
+        # Plot with conditional fit overlay
         return plot(
             freq_to_use,
             signal_to_use,
-            fit=fitted_signal,
+            fit=fit_overlay,
             params=self.resonator_params,
             fit_params=self.resonator_params,
             **kwargs,
