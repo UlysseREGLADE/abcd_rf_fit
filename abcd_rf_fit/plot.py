@@ -259,7 +259,8 @@ def plot(
     if fit is not None:
         mag_ax.plot(freq_disp, dB(fit), "-C1", label=fit_params_label, zorder=zorder)
 
-    if fit_params_label is not None:
+    handles, labels = mag_ax.get_legend_handles_labels()
+    if labels: 
         mag_ax.legend(loc="upper right", framealpha=0.9)
 
     mag_ax.grid(alpha=0.3)
