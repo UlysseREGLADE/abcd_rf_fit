@@ -903,7 +903,7 @@ resonator_dict = {
 
 
 def get_fit_function(geometry, amplitude=True, edelay=True):
-    if type(geometry) == str:
+    if isinstance(geometry, str):
         resonator_func = resonator_dict[geometry]
     else:
         resonator_func = geometry
