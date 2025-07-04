@@ -23,7 +23,9 @@ Typical usage:
 """
 
 import warnings
-warnings.filterwarnings("always")
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
 from typing import List, Tuple
 
 import numpy as np
