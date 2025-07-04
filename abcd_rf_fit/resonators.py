@@ -446,109 +446,47 @@ class FitResult:
         return validation
 
     def to_dict(self):
-        """Export fit results to dictionary for saving/serialization.
+        """Export fit results to dictionary with main parameters and R².
 
-        Returns a comprehensive dictionary with named parameters, their values,
-        uncertainties, and all fit quality information.
+        Returns a simplified dictionary with the main resonator parameters,
+        quality factors, and fit quality metric.
         """
-        # Get geometry string
-        geometry = None
-        for geom, func in resonator_dict.items():
-            if self.resonator_params.resonator_func == func:
-                geometry = geom
-                break
-        # Create structured parameter dictionary with names, values, and errors
-        parameters = {}
-        param_names = [
-            "f_0",
-            "kappa",
-            "kappa_i",
-            "kappa_c",
-            "edelay",
-            "phi_0",
-            "Q",
-            "Q_i",
-            "Q_c",
-        ]
-
-        for param_name in param_names:
-            param_value = getattr(self.resonator_params, param_name, None)
-            if param_value is not None:
-                param_error = self.get_param_error(param_name)
-
-                # Handle complex numbers for JSON serialization
-                if isinstance(param_value, complex):
-                    serializable_value = {
-                        "real": float(param_value.real),
-                        "imag": float(param_value.imag),
-                        "_type": "complex",
-                    }
-                elif isinstance(param_value, np.ndarray):
-                    serializable_value = param_value.tolist()
-                elif isinstance(param_value, (np.integer, np.floating)):
-                    serializable_value = float(param_value)
-                else:
-                    serializable_value = param_value
-
-                parameters[param_name] = {
-                    "value": serializable_value,
-                    "error": float(param_error) if param_error is not None else None,
-                    "relative_error": (
-                        float(abs(param_error / param_value))
-                        if param_error is not None and param_value != 0
-                        else None
-                    ),
-                }
-
-        # Build comprehensive result dictionary
-        result_dict = {
-            # High-level summary
-            "geometry": geometry,
-            "fit_summary": self._get_fit_summary(),
-            # Structured parameters with names, values, and uncertainties
-            "parameters": parameters,
-            # Raw arrays for compatibility
-            "raw_data": {
-                "fitted_params": [
-                    (
-                        float(x)
-                        if not isinstance(x, complex)
-                        else {
-                            "real": float(x.real),
-                            "imag": float(x.imag),
-                            "_type": "complex",
-                        }
-                    )
-                    for x in self.resonator_params.params
-                ],
-                "param_errors": (
-                    [float(x) for x in self.param_errors.tolist()]
-                    if self.param_errors is not None
-                    else None
-                ),
-                "covariance_matrix": (
-                    [[float(x) for x in row] for row in self.pcov.tolist()]
-                    if self.pcov is not None
-                    else None
-                ),
-                "correlation_matrix": (
-                    [
-                        [float(x) for x in row]
-                        for row in self.correlation_matrix.tolist()
-                    ]
-                    if self.correlation_matrix is not None
-                    else None
-                ),
-            },
-            # Metadata
-            "metadata": {
-                "parameter_count": len(self.resonator_params.params),
-                "has_uncertainties": self.param_errors is not None,
-                "has_covariance": self.pcov is not None,
-            },
-        }
-
-        return result_dict
+        result = {}
+        
+        # Main parameters
+        if self.resonator_params.f_0 is not None:
+            result["f_0"] = float(self.resonator_params.f_0)
+        
+        if self.resonator_params.kappa is not None:
+            result["kappa"] = float(self.resonator_params.kappa)
+        
+        if self.resonator_params.kappa_i is not None:
+            result["kappa_i"] = float(self.resonator_params.kappa_i)
+        
+        if self.resonator_params.kappa_c is not None:
+            result["kappa_c"] = float(self.resonator_params.kappa_c)
+        
+        if self.resonator_params.edelay is not None:
+            result["edelay"] = float(self.resonator_params.edelay)
+        
+        if self.resonator_params.phi_0 is not None:
+            result["phi_0"] = float(self.resonator_params.phi_0)
+        
+        # Quality factors
+        if self.resonator_params.Q is not None:
+            result["Q"] = float(self.resonator_params.Q)
+        
+        if self.resonator_params.Q_i is not None:
+            result["Q_i"] = float(self.resonator_params.Q_i)
+        
+        if self.resonator_params.Q_c is not None:
+            result["Q_c"] = float(self.resonator_params.Q_c)
+        
+        # R² from fit quality
+        if self.r_squared is not None:
+            result["r_squared"] = float(self.r_squared)
+        
+        return result
 
     def _get_fit_summary(self):
         """Generate a human-readable summary of the fit results."""
