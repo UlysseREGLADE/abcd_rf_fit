@@ -129,6 +129,42 @@ class FitResult:
         return None
 
     @property
+    def background_correction(self) -> Optional[np.ndarray]:
+        """Calculate background correction factor from original and processed signals.
+
+        Returns
+        -------
+        np.ndarray or None
+            Complex background correction factor applied to original signal,
+            or None if no background removal was performed or signals unavailable.
+
+        Notes
+        -----
+        The background correction is calculated as:
+        background_correction = original_signal / signal
+
+        Where:
+        - original_signal: Signal before background removal
+        - signal: Signal after background removal
+
+        This factor can be used to understand what background trend was removed
+        during the fitting process.
+        """
+        if (self.original_signal is not None and
+            self.signal is not None and
+            self.original_signal.shape == self.signal.shape):
+
+            # Check if signals are actually different (background was removed)
+            if not np.allclose(self.original_signal, self.signal, rtol=1e-12):
+                # Avoid division by zero
+                mask = np.abs(self.signal) > 1e-15
+                correction = np.ones_like(self.signal, dtype=complex)
+                correction[mask] = self.original_signal[mask] / self.signal[mask]
+                return correction
+
+        return None
+
+    @property
     def r_squared(self) -> Optional[float]:
         """Direct access to R-squared value.
 
