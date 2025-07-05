@@ -486,6 +486,34 @@ class FitResult:
         if self.r_squared is not None:
             result["r_squared"] = float(self.r_squared)
         
+        # Background correction (complex signal)
+        bg_correction = self.background_correction
+        if bg_correction is not None:
+            # Store as separate real and imaginary arrays for HDF5 compatibility
+            result["background_correction_real"] = bg_correction.real
+            result["background_correction_imag"] = bg_correction.imag
+        
+        # Circle center in IQ plane
+        if self.resonator_params.resonator_func in [reflection, reflection_mismatched, hanger, hanger_mismatched]:
+            kappa = self.resonator_params.kappa
+            kappa_c = self.resonator_params.kappa_c
+            phi_0 = self.resonator_params.phi_0
+            
+            if kappa is not None and kappa_c is not None and kappa != 0:
+                # Calculate I component (real part)
+                I_center = 1 - kappa_c / kappa
+                
+                # Calculate Q component (imaginary part)
+                if phi_0 is not None:
+                    # For mismatched geometries with phase offset
+                    Q_center = -kappa_c / kappa * np.tan(phi_0)
+                else:
+                    # For matched geometries (phi_0 = 0)
+                    Q_center = 0.0
+                
+                result["circle_center_I"] = float(I_center)
+                result["circle_center_Q"] = float(Q_center)
+        
         return result
 
     def _get_fit_summary(self):
