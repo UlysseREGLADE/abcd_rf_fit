@@ -77,7 +77,7 @@ class FitResult:
         pcov : np.ndarray, optional
             Parameter covariance matrix from fitting.
         fit_func : callable, optional
-            Fitted function for quality assessment.
+            The unbound fit function that takes (freq, *params).
         original_signal : np.ndarray, optional
             Original signal array before any background removal.
         """
@@ -88,7 +88,11 @@ class FitResult:
             original_signal  # Original signal before background removal
         )
         self.pcov = pcov
-        self.fit_func = fit_func
+        self._unbound_fit_func = fit_func
+        if self._unbound_fit_func:
+            self.fit_func = lambda f: self._unbound_fit_func(f, *self.params.params)
+        else:
+            self.fit_func = None
 
     @property
     def params(self) -> "ResonatorParams":
@@ -269,7 +273,7 @@ class FitResult:
         if self.fit_func is None or self.freq is None or self.signal is None:
             return None
 
-        fitted_signal = self.fit_func(self.freq, *self.resonator_params.params)
+        fitted_signal = self.fit_func(self.freq)
         residuals = self.signal - fitted_signal
 
         # R-squared
