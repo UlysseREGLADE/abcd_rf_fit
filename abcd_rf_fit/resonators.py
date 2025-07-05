@@ -830,22 +830,30 @@ class FitResult:
             )
             
             if is_valid:
-                # Calculate fitted signal for valid fits
-                fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
+                # Create interpolated frequency array for smooth fit curve
+                freq_interp = np.linspace(freq_to_use.min(), freq_to_use.max(), 501)
+                # Calculate fitted signal for valid fits using interpolated frequency
+                fitted_signal = self.fit_func(freq_interp)
                 fit_overlay = fitted_signal
+                fit_freq = freq_interp
             else:
                 # Don't show fit overlay for invalid fits
                 fit_overlay = None
+                fit_freq = None
         else:
             # Always calculate fitted signal when auto_validate is disabled
-            fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
+            # Create interpolated frequency array for smooth fit curve
+            freq_interp = np.linspace(freq_to_use.min(), freq_to_use.max(), 501)
+            fitted_signal = self.fit_func(freq_interp)
             fit_overlay = fitted_signal
+            fit_freq = freq_interp
 
         # Plot with conditional fit overlay
         return plot(
             freq_to_use,
             signal_to_use,
             fit=fit_overlay,
+            fit_freq=fit_freq,
             params=self.resonator_params,
             fit_params=self.resonator_params,
             **kwargs,

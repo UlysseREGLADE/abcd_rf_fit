@@ -97,6 +97,7 @@ def plot(
     freq,
     signal,
     fit=None,
+    fit_freq=None,  # Nueva opción para frecuencias interpoladas del fit
     fig=None,
     params=None,
     fit_params=None,
@@ -110,10 +111,14 @@ def plot(
     style="Normal",
     title=None,
 ):
+    # Si se proporciona fit_freq, usar esas frecuencias para el fit
+    # sino usar las frecuencias originales
+    freq_for_fit = fit_freq if fit_freq is not None else freq
+    
     if fit_params is not None and fit_params.edelay is not None:
         corrected_signal = signal * np.exp(-2j * np.pi * freq * fit_params.edelay)
         if fit is not None:
-            corrected_fit = fit * np.exp(-2j * np.pi * freq * fit_params.edelay)
+            corrected_fit = fit * np.exp(-2j * np.pi * freq_for_fit * fit_params.edelay)
     else:
         corrected_signal = None
 
@@ -126,6 +131,8 @@ def plot(
 
     if center_freq:
         freq = freq - fit_params.f_0
+        if fit_freq is not None:
+            freq_for_fit = freq_for_fit - fit_params.f_0
 
     if style == "Normal":
         size = 10
@@ -140,6 +147,12 @@ def plot(
         mpl.rcParams.update({"font.size": font_size})
 
     freq_disp, freq_prefix = get_prefix(freq)
+    # Para el fit usar sus propias frecuencias si están disponibles
+    if fit_freq is not None:
+        freq_fit_disp, _ = get_prefix(freq_for_fit)
+    else:
+        freq_fit_disp = freq_disp
+        
     if params is not None:
         params_label = params.str(
             latex=True,
@@ -257,7 +270,8 @@ def plot(
         alpha=alpha_fit,
     )
     if fit is not None:
-        mag_ax.plot(freq_disp, dB(fit), "-C1", label=fit_params_label, zorder=zorder)
+        # Usar frecuencias interpoladas para el fit si están disponibles
+        mag_ax.plot(freq_fit_disp, dB(fit), "-C1", label=fit_params_label, zorder=zorder)
 
     handles, labels = mag_ax.get_legend_handles_labels()
     if labels: 
@@ -284,7 +298,8 @@ def plot(
             alpha=alpha_fit,
         )
         if fit is not None:
-            arg_ax.plot(freq_disp, deg(fit), "-C1", zorder=zorder)
+            # Usar frecuencias interpoladas para el fit si están disponibles
+            arg_ax.plot(freq_fit_disp, deg(fit), "-C1", zorder=zorder)
     else:
         if plot_not_corrected:
             # arg_ax.plot(freq_disp, deg(signal), ".C0", alpha=0.15)
@@ -306,31 +321,24 @@ def plot(
         )
         if fit is not None:
             if plot_not_corrected:
-                arg_ax.plot(freq_disp, deg(fit), "-C1", alpha=0.15, zorder=zorder)
-            arg_ax.plot(freq_disp, deg(corrected_fit), "-C1", zorder=zorder)
+                # Usar frecuencias interpoladas para el fit si están disponibles
+                arg_ax.plot(freq_fit_disp, deg(fit), "-C1", alpha=0.15, zorder=zorder)
+            # Usar frecuencias interpoladas para el fit si están disponibles
+            arg_ax.plot(freq_fit_disp, deg(corrected_fit), "-C1", zorder=zorder)
 
-        angle_min, angle_max = (
-            np.min(deg(corrected_signal)),
-            np.max(deg(corrected_signal)),
-        )
-        angle_center, angle_span = (
-            0.5 * (angle_min + angle_max),
-            0.5 * (angle_max - angle_min),
-        )
-        arg_ax.set_ylim(
-            angle_center - 1.1 * angle_span,
-            angle_center + 1.1 * angle_span,
-        )
-
-    # if params_label is not None:
-    #     arg_ax.legend(bbox_to_anchor=(0, 0), loc='upper left')
     arg_ax.grid(alpha=0.3)
-    arg_ax.set_ylabel(rf"$\arg({y_axis_str})$ [deg]")
-    arg_ax.set_xlabel(f"f [{freq_prefix}Hz]")
+    arg_ax.set_ylabel(rf"$\arg({y_axis_str})$ [°]")
+    arg_ax.set_xlabel(rf"$f$ [{freq_prefix}Hz]")
 
-    fig.align_ylabels([mag_ax, arg_ax])
-    if plot_circle:
-        fig.align_xlabels([arg_ax, circle_ax])
-    format_fig(fig)
+    if params_label is not None:
+        arg_ax.text(
+            0.05,
+            0.95,
+            params_label,
+            transform=arg_ax.transAxes,
+            verticalalignment="top",
+            bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
+        )
 
+    plt.tight_layout()
     return fig
