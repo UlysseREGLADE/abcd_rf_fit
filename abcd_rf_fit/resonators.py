@@ -822,32 +822,22 @@ class FitResult:
             raise ValueError(error_msg)
 
         # Automatic fit validation logic
+        show_fit = True
         if auto_validate:
             # Check if fit is valid for plotting with overlay
             is_valid = self.is_valid_for_plotting(
                 min_r_squared=min_r_squared,
                 freq_range=freq_range
             )
-            
-            if is_valid:
-                # Calculate fitted signal for valid fits
-                fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
-                fit_overlay = fitted_signal
-            else:
-                # Don't show fit overlay for invalid fits
-                fit_overlay = None
-        else:
-            # Always calculate fitted signal when auto_validate is disabled
-            fitted_signal = self.fit_func(freq_to_use, *self.resonator_params.params)
-            fit_overlay = fitted_signal
+            if not is_valid:
+                show_fit = False
 
         # Plot with conditional fit overlay
         return plot(
             freq_to_use,
             signal_to_use,
-            fit=fit_overlay,
+            fit_params=self.resonator_params if show_fit else None,
             params=self.resonator_params,
-            fit_params=self.resonator_params,
             **kwargs,
         )
 

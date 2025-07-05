@@ -97,6 +97,7 @@ def plot(
     freq,
     signal,
     fit=None,
+    fit_freq=None,
     fig=None,
     params=None,
     fit_params=None,
@@ -109,11 +110,23 @@ def plot(
     alpha_fit=1.0,
     style="Normal",
     title=None,
+    n_interp=501,
 ):
+    if fit_params is not None:
+        # New method: generate interpolated fit from ResonatorParams
+        fit_freq = np.linspace(freq.min(), freq.max(), n_interp)
+        fit = fit_params(fit_freq)
+    elif fit is not None and fit_freq is None:
+        # Backward compatibility: if fit data is provided but no fit_freq,
+        # assume the fit corresponds to the original frequency points.
+        fit_freq = freq
+    if fit_freq is None and fit is not None:
+        fit_freq = freq
+
     if fit_params is not None and fit_params.edelay is not None:
         corrected_signal = signal * np.exp(-2j * np.pi * freq * fit_params.edelay)
         if fit is not None:
-            corrected_fit = fit * np.exp(-2j * np.pi * freq * fit_params.edelay)
+            corrected_fit = fit * np.exp(-2j * np.pi * fit_freq * fit_params.edelay)
     else:
         corrected_signal = None
 
@@ -140,6 +153,8 @@ def plot(
         mpl.rcParams.update({"font.size": font_size})
 
     freq_disp, freq_prefix = get_prefix(freq)
+    fit_freq_disp, _ = get_prefix(fit_freq, freq_prefix)
+
     if params is not None:
         params_label = params.str(
             latex=True,
@@ -257,7 +272,7 @@ def plot(
         alpha=alpha_fit,
     )
     if fit is not None:
-        mag_ax.plot(freq_disp, dB(fit), "-C1", label=fit_params_label, zorder=zorder)
+        mag_ax.plot(fit_freq_disp, dB(fit), "-C1", label=fit_params_label, zorder=zorder)
 
     handles, labels = mag_ax.get_legend_handles_labels()
     if labels: 
@@ -284,7 +299,7 @@ def plot(
             alpha=alpha_fit,
         )
         if fit is not None:
-            arg_ax.plot(freq_disp, deg(fit), "-C1", zorder=zorder)
+            arg_ax.plot(fit_freq_disp, deg(fit), "-C1", zorder=zorder)
     else:
         if plot_not_corrected:
             # arg_ax.plot(freq_disp, deg(signal), ".C0", alpha=0.15)
@@ -306,8 +321,8 @@ def plot(
         )
         if fit is not None:
             if plot_not_corrected:
-                arg_ax.plot(freq_disp, deg(fit), "-C1", alpha=0.15, zorder=zorder)
-            arg_ax.plot(freq_disp, deg(corrected_fit), "-C1", zorder=zorder)
+                arg_ax.plot(fit_freq_disp, deg(fit), "-C1", alpha=0.15, zorder=zorder)
+            arg_ax.plot(fit_freq_disp, deg(corrected_fit), "-C1", zorder=zorder)
 
         angle_min, angle_max = (
             np.min(deg(corrected_signal)),
