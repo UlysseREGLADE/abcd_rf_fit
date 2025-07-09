@@ -312,6 +312,8 @@ def meta_fit_edelay(freq: np.ndarray, signal: np.ndarray, rec_depth: int = 0) ->
     -----
     The search spans ±1.5/(freq_max - freq_min) around the gradient estimate,
     using 21 equally spaced test points for robust delay estimation.
+    If the optimal delay is less than 2 ns, it is set to zero to avoid
+    fitting noise as electrical delay.
     """
     quick_fit = get_abcd
 
@@ -328,8 +330,13 @@ def meta_fit_edelay(freq: np.ndarray, signal: np.ndarray, rec_depth: int = 0) ->
 
         l2_error_array[i] = np.sum(np.abs(s - abcd_fit) ** 2) / freq.size
 
-    return edelay_array[np.argmin(l2_error_array)]
+    optimal_edelay = edelay_array[np.argmin(l2_error_array)]
 
+    # Set to zero if less than 2 ns
+    if np.abs(optimal_edelay) < 2e-9:
+        return 0.0
+    
+    return optimal_edelay
 
 def _fit_signal_core(
     freq: np.ndarray,
