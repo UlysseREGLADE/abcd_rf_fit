@@ -169,6 +169,44 @@ class FitResult:
         return None
 
     @property
+    def background_at_f0(self) -> Optional[complex]:
+        """Calculate background value at resonance frequency f_0 using interpolation.
+
+        Returns
+        -------
+        complex or None
+            Background value (complex) at the resonance frequency f_0,
+            or None if background correction is not available or f_0 is not defined.
+
+        Notes
+        -----
+        This property interpolates the background correction to find the exact value 
+        at the resonance frequency f_0. The background value is calculated as:
+        background_at_f0 = original_signal[f_0] / signal[f_0]
+
+        Uses linear interpolation for both real and imaginary parts separately
+        to provide accurate results even when f_0 is between measurement points.
+        """
+        if (self.freq is not None and 
+            self.resonator_params.f_0 is not None and
+            self.background_correction is not None):
+            
+            # Check if f_0 is within the frequency range
+            f_min, f_max = self.freq.min(), self.freq.max()
+            if not (f_min <= self.resonator_params.f_0 <= f_max):
+                return None
+            
+            # Interpolate real and imaginary parts separately
+            real_interp = np.interp(self.resonator_params.f_0, self.freq, 
+                                  self.background_correction.real)
+            imag_interp = np.interp(self.resonator_params.f_0, self.freq, 
+                                  self.background_correction.imag)
+            
+            return complex(real_interp, imag_interp)
+        
+        return None
+
+    @property
     def r_squared(self) -> Optional[float]:
         """Direct access to R-squared value.
 
@@ -496,6 +534,14 @@ class FitResult:
             # Store as separate real and imaginary arrays for HDF5 compatibility
             result["background_correction_real"] = bg_correction.real
             result["background_correction_imag"] = bg_correction.imag
+        
+        # Background value at resonance frequency f_0
+        bg_at_f0 = self.background_at_f0
+        if bg_at_f0 is not None:
+            result["background_at_f0_real"] = float(bg_at_f0.real)
+            result["background_at_f0_imag"] = float(bg_at_f0.imag)
+            result["background_at_f0_magnitude"] = float(np.abs(bg_at_f0))
+            result["background_at_f0_phase"] = float(np.angle(bg_at_f0))
         
         # Circle center in IQ plane
         if self.resonator_params.resonator_func in [reflection, reflection_mismatched, hanger, hanger_mismatched]:
