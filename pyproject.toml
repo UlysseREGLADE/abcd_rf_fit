@@ -1,6 +1,6 @@
 [project]
 name = "abcd_rf_fit"
-version = "0.1.0"
+version = "0.1.3"
 description = "Rational function fit library"
 keywords = ["fit", "numerics"]
 authors = [
@@ -15,10 +15,6 @@ dependencies = [
     "numpy",
     "scipy",
 ]
-
-[build-system]
-requires = ["uv_build >= 0.8.17, <0.9.0"]
-build-backend = "uv_build"
 
 [project.optional-dependencies]
 dev = [
