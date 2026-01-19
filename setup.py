@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='abcd_rf_fit',
-    version='0.1.2',
+    version='0.1.3',
     description='Rational function fit library',
     url='https://github.com/UlysseREGLADE/abcd_rf_fit',
     author='Ulysse REGLADE',
