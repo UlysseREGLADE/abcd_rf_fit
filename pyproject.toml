@@ -1,20 +1,31 @@
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "abcd_rf_fit"
-version = "0.0.0"
+version = "0.1.0"
+description = "Rational function fit library"
+keywords = ["fit", "numerics"]
+authors = [
+    {name = "Ulysse REGLADE", email = "ulysse.reglade@yahoo.com"},
+]
 readme = "README.md"
+license = { file = "LICENSE" }
 
-[tools.setuptools]
-python-version = ">3.7"
-
+requires-python = ">=3.10"
 dependencies = [
+    "matplotlib",
+    "numpy",
+    "scipy",
 ]
 
-[tool.setuptools.packages.find]
-include = ['abcd_rf_fit*']
+[build-system]
+requires = ["uv_build >= 0.8.17, <0.9.0"]
+build-backend = "uv_build"
+
+[project.optional-dependencies]
+dev = [
+    "pytest-ordering",
+    "pytest-sugar",
+    "pytest-xdist",
+]
 
 [project.urls]
-"Homepage" = "https://github.com/Quantronics/abcd_rf_fit"
+Repository = "https://github.com/UlysseREGLADE/abcd_rf_fit"
