@@ -1,6 +1,8 @@
 import numpy as np
 from copy import deepcopy
 from .plot import plot
+import matplotlib.pyplot as plt
+from dataclasses import dataclass
 
 if __name__ == "__main__":
 
@@ -132,8 +134,8 @@ class ResonatorParams(object):
             self.kappa_c_real_index = 2
             self.phi_0_index = 3
             if len(self.params) in [6, 7]:
-                self.re_a_in_index = 3
-                self.im_a_in_index = 4
+                self.re_a_in_index = 4
+                self.im_a_in_index = 5
             if len(self.params) in [5, 7]:
                 self.edelay_index = -1
 
@@ -275,11 +277,13 @@ class ResonatorParams(object):
                 params[:len(args)] = args
             else:
                 resonator = deepcopy(self)
+                # Oh waw, did not remembered this piece of code
+                # I'm such a dark Sasuke
                 for key in kwargs:
                     resonator.params[resonator.__dict__[key + "_index"]] = kwargs[key]
                 resonator.params[:len(args)] = args
                 params = resonator.params
-        
+
         return fit_func(freq, *params)
     
     def plot(
@@ -313,7 +317,100 @@ class ResonatorParams(object):
             style=style,
             title=title
         )
+        return self
 
+@dataclass
+class ResonatorCollection():
+    """
+    Docstring for ResonatorCollection
+    Essentailly, a list of Resonators params
+    """
+    resonators: list[ResonatorParams]
+    a_in: complex = 1
+    edelay: float = 1
+    freq: np.ndarray | None = None
+    signal: np.ndarray | None = None
+
+    def plot(
+        self,
+        fig: plt.Figure | None = None,
+        plot_not_corrected: bool = True,
+        font_size: int | None = None,
+        plot_circle: bool = True,
+        center_freq: bool = False,
+        only_f_and_kappa: bool = False,
+        precision: int = 2,
+        alpha_fit: float = 1.0,
+        style: str = 'Normal',
+        title: str | None = None,
+        params: ResonatorParams | None = None,
+    ):
+        plot(
+            freq = self.freq,
+            signal = self.signal,
+            fit=self(self.freq),
+            fig=fig,
+            fit_params=self,
+            plot_not_corrected=plot_not_corrected,
+            font_size=font_size,
+            plot_circle=plot_circle,
+            center_freq=center_freq,
+            only_f_and_kappa=only_f_and_kappa,
+            precision=precision,
+            alpha_fit=alpha_fit,
+            style=style,
+            title=title,
+            params=params,
+        )
+        return self
+
+    def str(
+        self,
+        latex=False,
+        separator=", ",
+        precision=2,
+        only_f_and_kappa=False,
+        f_precision=2,
+        red_warning = False
+    ):
+        ret = ''
+        for resontaor in self.resonators:
+            ret += resontaor.str(
+                latex=latex,
+                separator=separator,
+                precision=precision,
+                only_f_and_kappa=only_f_and_kappa,
+                f_precision=f_precision,
+                red_warning=red_warning
+            )
+            ret += '\n'
+        return ret
+    
+    def __str__(self) -> str:
+        return self.str()
+
+    def __repr__(self):
+        return self.__str__()
+    
+    @property
+    def f_0(self):
+        return np.mean([resonator.f_0 for resonator in self.resonators])
+
+    def __call__(self, freq):
+        ret = np.zeros_like(freq).astype(complex)
+
+        for resonator in self.resonators:
+            print(resonator)
+            ret += resonator(freq, re_a_in = 1, im_a_in = 0, edelay=0)
+        ret -= len(self.resonators) - 1
+
+        ret *= self.a_in
+        print("edelay")
+        print(self.edelay)
+        print()
+        ret *= np.exp(+2j*np.pi*self.edelay*self.freq)
+
+        return ret
 
 if __name__ == "__main__":
 

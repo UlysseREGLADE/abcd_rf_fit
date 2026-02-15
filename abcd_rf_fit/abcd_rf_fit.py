@@ -1,14 +1,25 @@
-from inspect import signature
-import numpy as np
 import warnings
 
+import numpy as np
+
+from .resonators import (
+    ResonatorParams,
+    ResonatorCollection,
+    get_fit_function,
+    hanger,
+    hanger_mismatched,
+    reflection,
+    reflection_mismatched,
+    resonator_dict,
+    transmission,
+)
 from .utils import (
+    complex_fit,
     guess_edelay_from_gradient,
     smooth_gradient,
-    complex_fit,
 )
+from .vector_fit import vector_fit_siso
 
-from .resonators import *
 
 def get_abcd(freq, signal, rec_depth=0):
 
@@ -119,23 +130,34 @@ def abcd2params(abcd, geometry):
         return f_0, kappa, kappa_c_real, phi_0, np.real(a_in), np.imag(a_in)
 
 
-def meta_fit_edelay(freq, signal, rec_depth=0):
+def meta_fit_edelay(
+    freq, 
+    signal,
+    rec_depth=0,
+    fit_method: str = 'abcd',
+    n_poles:int = 1,
+    n_guess: int = 1001,
+):
+    assert fit_method in ['abcd', 'vector_fit']
 
-    quick_fit = get_abcd
+    if fit_method == 'abcd':
+        def quick_fit(freq, s, rec_depth):
+            abcd_fit = get_abcd(freq, s, rec_depth)[1]
+            return np.sum(np.abs(s - abcd_fit) ** 2) / freq.size
+    else:
+        def quick_fit(freq, s, rec_depth):
+            return vector_fit_siso(freq, s, n_poles, rec_depth)['least_square_error']
 
     guess_edelay = guess_edelay_from_gradient(freq, signal)
 
     edelay_span = 1.5 / (np.max(freq) - np.min(freq))
 
-    edelay_array = guess_edelay + np.linspace(-1, 1, 1001) * edelay_span
+    edelay_array = guess_edelay + np.linspace(-1, 1, n_guess) * edelay_span
     l2_error_array = np.zeros_like(edelay_array)
 
     for i, ed in enumerate(edelay_array):
-
         s = signal * np.exp(-2j * np.pi * freq * ed)
-        _, abcd_fit = quick_fit(freq, s, rec_depth)
-
-        l2_error_array[i] = np.sum(np.abs(s - abcd_fit) ** 2) / freq.size
+        l2_error_array[i] = quick_fit(freq, s, rec_depth)
 
     return edelay_array[np.argmin(l2_error_array)]
 
@@ -189,22 +211,91 @@ def fit_signal(
     return fit_func, ResonatorParams(params, geometry, freq, signal)
 
 def analyze(
-    freq,
-    signal,
-    geometry,
-    fit_amplitude=True,
-    fit_edelay=True,
-    final_ls_opti=True,
-    allow_mismatch=True,
-    rec_depth=1,
+    freq: np.ndarray,
+    signal: np.ndarray,
+    geometry: str | list[str] = 'r',
+    fit_amplitude: bool = True,
+    fit_edelay: bool =True,
+    final_ls_opti: bool =True,
+    allow_mismatch: bool =True,
+    rec_depth: int | None = None,
 ):
-    return fit_signal(
-        freq,
-        signal,
-        geometry,
-        fit_amplitude,
-        fit_edelay,
-        final_ls_opti,
-        allow_mismatch,
-        rec_depth,
-        api_warning = False)[1]
+    if isinstance(geometry, str):
+        rec_depth = 1
+        return fit_signal(
+            freq,
+            signal,
+            geometry,
+            fit_amplitude,
+            fit_edelay,
+            final_ls_opti,
+            allow_mismatch,
+            rec_depth,
+            api_warning = False)[1]
+    else:
+        rec_depth = 50
+        for g in geometry:
+            assert resonator_dict[g] is not transmission
+
+        if fit_edelay:
+            edelay = meta_fit_edelay(
+                freq,
+                signal,
+                rec_depth=rec_depth,
+                fit_method='vector_fit',
+                n_guess = 101
+            )
+        else:
+            edelay = 0
+
+        corrected_signal = signal * np.exp(-2j * np.pi * edelay * freq)
+        vector_fit_dict = vector_fit_siso(
+            freq,
+            corrected_signal,
+            n_poles=len(geometry),
+            n_iter=rec_depth
+        )
+
+        resonators = []
+        for i, g in enumerate(geometry):
+            resonator_geometry = g
+            params = [
+                vector_fit_dict['poles'][i].real,
+                2*vector_fit_dict['poles'][i].imag
+            ]
+            if resonator_dict[g] is reflection:
+                params.append(
+                    np.imag(vector_fit_dict['residues'][i]/vector_fit_dict['r0'])
+                )
+            elif resonator_dict[g] is hanger:
+                params.append(
+                    2*np.imag(vector_fit_dict['residues'][i]/vector_fit_dict['r0'])
+                )
+            if allow_mismatch:
+                params.append(
+                    np.angle(-1j*vector_fit_dict['residues'][i]/vector_fit_dict['r0'])
+                )
+                if resonator_dict[g] is reflection:
+                    resonator_geometry = "rm"
+                elif resonator_dict[g] is hanger:
+                    resonator_geometry = "hm"
+            params.append(np.real(vector_fit_dict['r0']))
+            params.append(np.imag(vector_fit_dict['r0']))
+            params.append(edelay)
+
+            resonator = ResonatorParams(
+                params,
+                resonator_geometry,
+                freq,
+                signal,
+            )
+            resonators.append(resonator)
+        
+        # TODO: final least square
+        return ResonatorCollection(
+            resonators=resonators,
+            a_in=vector_fit_dict['r0'],
+            edelay=edelay,
+            signal=signal,
+            freq=freq
+        )

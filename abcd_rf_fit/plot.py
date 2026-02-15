@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.gridspec import GridSpec
 from .utils import get_prefix, dB, deg
 # from .resonators import resonator_dict
 
@@ -76,23 +75,26 @@ def format_fig(fig, ignored_axes=None, cbar_axes = None):
                 spine.set_alpha(0.25)
 
 def plot(
-    freq,
-    signal,
-    fit=None,
-    fig=None,
-    params=None,
-    fit_params=None,
-    plot_not_corrected=True,
-    font_size=None,
-    plot_circle=True,
-    center_freq=False,
-    only_f_and_kappa=False,
-    precision=2,
-    alpha_fit=1.0,
-    style='Normal',
-    title=None,
+    freq: np.ndarray,
+    signal: np.ndarray,
+    fit: np.ndarray | None = None,
+    fig: plt.Figure | None = None,
+    params: None = None,
+    fit_params: None = None,
+    plot_not_corrected: bool = True,
+    font_size: int | None = None,
+    plot_circle: bool = True,
+    center_freq: bool = False,
+    only_f_and_kappa: bool = False,
+    precision: int = 2,
+    alpha_fit: float = 1.0,
+    style: str = 'Normal',
+    title: str | None = None,
 ):
+    assert style in ['Normal', 'Leghtas']
 
+    corrected_fit = fit
+    corrected_signal = signal
     if fit_params is not None and fit_params.edelay is not None:
         corrected_signal = signal * np.exp(-2j * np.pi * freq * fit_params.edelay)
         if fit is not None:
@@ -100,21 +102,14 @@ def plot(
     else:
         corrected_signal = None
     
-    # y_axis_str = r'S_{11}'
-    # if fit_params is not None:
-    #     if fit_params.resonator_func == resonator_dict['t']:
-    #         y_axis_str = r'S_{21}'
-    
     y_axis_str = r'S'
     
     if center_freq:
         freq = freq - fit_params.f_0
-    
-    if style == 'Normal':
-        size = 10
-        zorder = 1
-        # facecolors = 'C0'
-        facecolors = 'none'
+
+    size = 10
+    zorder = 1
+    facecolors = 'none'
     if style == 'Leghtas':
         size = 10
         zorder = -10
@@ -200,7 +195,7 @@ def plot(
         mag_ax.legend(bbox_to_anchor=(0.5*(1 + width_ratios[1]/width_ratios[0]), 1), loc='lower center')
     
     mag_ax.grid(alpha=0.3)
-    mag_ax.set_ylabel(r"$|%s|$ [dB]"%y_axis_str)
+    mag_ax.set_ylabel(f"$|{y_axis_str}|$ [dB]")
     mag_ax.xaxis.set_ticklabels([])
 
     if plot_circle:
