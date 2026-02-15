@@ -400,14 +400,10 @@ class ResonatorCollection():
         ret = np.zeros_like(freq).astype(complex)
 
         for resonator in self.resonators:
-            print(resonator)
             ret += resonator(freq, re_a_in = 1, im_a_in = 0, edelay=0)
         ret -= len(self.resonators) - 1
 
         ret *= self.a_in
-        print("edelay")
-        print(self.edelay)
-        print()
         ret *= np.exp(+2j*np.pi*self.edelay*self.freq)
 
         return ret

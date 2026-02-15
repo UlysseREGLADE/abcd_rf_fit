@@ -137,6 +137,7 @@ def meta_fit_edelay(
     fit_method: str = 'abcd',
     n_poles:int = 1,
     n_guess: int = 1001,
+    edelay_span: float = 1.5
 ):
     assert fit_method in ['abcd', 'vector_fit']
 
@@ -150,7 +151,7 @@ def meta_fit_edelay(
 
     guess_edelay = guess_edelay_from_gradient(freq, signal)
 
-    edelay_span = 1.5 / (np.max(freq) - np.min(freq))
+    edelay_span = edelay_span / (np.max(freq) - np.min(freq))
 
     edelay_array = guess_edelay + np.linspace(-1, 1, n_guess) * edelay_span
     l2_error_array = np.zeros_like(edelay_array)
@@ -221,7 +222,8 @@ def analyze(
     rec_depth: int | None = None,
 ):
     if isinstance(geometry, str):
-        rec_depth = 1
+        if rec_depth is None:
+            rec_depth = 1
         return fit_signal(
             freq,
             signal,
@@ -233,7 +235,8 @@ def analyze(
             rec_depth,
             api_warning = False)[1]
     else:
-        rec_depth = 50
+        if rec_depth is None:
+            rec_depth = 50
         for g in geometry:
             assert resonator_dict[g] is not transmission
 
@@ -243,7 +246,9 @@ def analyze(
                 signal,
                 rec_depth=rec_depth,
                 fit_method='vector_fit',
-                n_guess = 101
+                n_poles=len(geometry),
+                n_guess = 101,
+                edelay_span = 2.5
             )
         else:
             edelay = 0
