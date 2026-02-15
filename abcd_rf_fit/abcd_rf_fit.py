@@ -239,11 +239,19 @@ def analyze(
             rec_depth = 50
         for g in geometry:
             assert resonator_dict[g] is not transmission
+        
+        freq_center = np.mean(freq)
+        scaled_freq = freq - freq_center
+        freq_ratio = np.max(np.abs(freq))
+        scaled_freq /= freq_ratio
+
+        signal_ratio = np.median(np.abs(signal))
+        scaled_signal = signal/signal_ratio
 
         if fit_edelay:
             edelay = meta_fit_edelay(
-                freq,
-                signal,
+                scaled_freq,
+                scaled_signal,
                 rec_depth=rec_depth,
                 fit_method='vector_fit',
                 n_poles=len(geometry),
@@ -253,28 +261,31 @@ def analyze(
         else:
             edelay = 0
 
-        corrected_signal = signal * np.exp(-2j * np.pi * edelay * freq)
+        corrected_signal = scaled_signal * np.exp(-2j * np.pi * edelay * scaled_freq)
         vector_fit_dict = vector_fit_siso(
-            freq,
+            scaled_freq,
             corrected_signal,
             n_poles=len(geometry),
             n_iter=rec_depth
         )
 
+        edelay /= freq_ratio
+        a_in = vector_fit_dict['r0']*signal_ratio*np.exp(-2j*np.pi*freq_center*edelay)
+
         resonators = []
         for i, g in enumerate(geometry):
             resonator_geometry = g
             params = [
-                vector_fit_dict['poles'][i].real,
-                2*vector_fit_dict['poles'][i].imag
+                vector_fit_dict['poles'][i].real*freq_ratio + freq_center,
+                2*vector_fit_dict['poles'][i].imag*freq_ratio
             ]
             if resonator_dict[g] is reflection:
                 params.append(
-                    np.imag(vector_fit_dict['residues'][i]/vector_fit_dict['r0'])
+                    np.imag(vector_fit_dict['residues'][i]/vector_fit_dict['r0'])*freq_ratio
                 )
             elif resonator_dict[g] is hanger:
                 params.append(
-                    2*np.imag(vector_fit_dict['residues'][i]/vector_fit_dict['r0'])
+                    2*np.imag(vector_fit_dict['residues'][i]/vector_fit_dict['r0'])*freq_ratio
                 )
             if allow_mismatch:
                 params.append(
@@ -284,8 +295,8 @@ def analyze(
                     resonator_geometry = "rm"
                 elif resonator_dict[g] is hanger:
                     resonator_geometry = "hm"
-            params.append(np.real(vector_fit_dict['r0']))
-            params.append(np.imag(vector_fit_dict['r0']))
+            params.append(np.real(a_in))
+            params.append(np.imag(a_in))
             params.append(edelay)
 
             resonator = ResonatorParams(
@@ -299,7 +310,7 @@ def analyze(
         # TODO: final least square
         return ResonatorCollection(
             resonators=resonators,
-            a_in=vector_fit_dict['r0'],
+            a_in=a_in,
             edelay=edelay,
             signal=signal,
             freq=freq
