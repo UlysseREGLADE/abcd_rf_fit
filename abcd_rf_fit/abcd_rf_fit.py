@@ -220,7 +220,10 @@ def analyze(
     final_ls_opti: bool =True,
     allow_mismatch: bool =True,
     rec_depth: int | None = None,
+    ordering: str = 'freq',
 ):
+    assert ordering in ['freq', 'kappa']
+
     if isinstance(geometry, str):
         if rec_depth is None:
             rec_depth = 1
@@ -307,9 +310,20 @@ def analyze(
             )
             resonators.append(resonator)
         
+        sorted_indexs = np.arange(len(geometry), dtype=int)
+        if ordering == 'freq':
+            sorted_indexs = np.argsort([resonator.f_0 for resonator in resonators])
+        elif ordering == 'kappa':
+            sorted_indexs = np.argsort([resonator.kappa for resonator in resonators])
+        
+        sorted_resonators = []
+        for index in sorted_indexs:
+            sorted_resonators.append(resonators[index])
+        
         # TODO: final least square
+
         return ResonatorCollection(
-            resonators=resonators,
+            resonators=sorted_resonators,
             a_in=a_in,
             edelay=edelay,
             signal=signal,
