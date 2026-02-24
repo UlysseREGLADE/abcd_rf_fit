@@ -319,13 +319,27 @@ def analyze(
         sorted_resonators = []
         for index in sorted_indexs:
             sorted_resonators.append(resonators[index])
-        
-        # TODO: final least square
 
-        return ResonatorCollection(
+        ret = ResonatorCollection(
             resonators=sorted_resonators,
             a_in=a_in,
             edelay=edelay,
             signal=signal,
             freq=freq
         )
+
+        if final_ls_opti:
+            params, pcov = complex_fit(ret, freq, signal, ret.params)
+            
+            n_params = 3
+            if allow_mismatch:
+                n_params = 4
+            
+            ret.errors = np.diag(pcov)**0.5
+
+            for i in range(len(geometry)):
+                ret.resonators[i].params[:n_params] = params[n_params*i: n_params*(i+1)]
+                ret.resonators[i].errors = np.zeros_like(ret.resonators[i].params)
+                ret.resonators[i].errors[:n_params] = ret.errors[n_params*i: n_params*(i+1)]
+        
+        return ret

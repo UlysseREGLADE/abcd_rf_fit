@@ -101,10 +101,11 @@ def get_fit_function(geometry, amplitude=True, edelay=True):
         raise Exception("Unreachable")
 
 class ResonatorParams(object):
-    def __init__(self, params, geometry, freq = None, signal = None):
+    def __init__(self, params, geometry, freq = None, signal = None, errors = None):
 
         self.resonator_func = resonator_dict[geometry]
         self.params = params
+        self.errors = errors
 
         self.freq = freq
         self.signal = signal
@@ -326,10 +327,11 @@ class ResonatorCollection():
     Essentailly, a list of Resonators params
     """
     resonators: list[ResonatorParams]
-    a_in: complex = 1
-    edelay: float = 1
+    a_in: complex | None = None
+    edelay: float | None = None
     freq: np.ndarray | None = None
     signal: np.ndarray | None = None
+    errors: np.ndarray | None = None
 
     def plot(
         self,
@@ -396,15 +398,63 @@ class ResonatorCollection():
     def f_0(self):
         return np.mean([resonator.f_0 for resonator in self.resonators])
 
-    def __call__(self, freq):
+    def __call__(self, freq, *params):
+        # params = [f, kappa, kappa_c, phi_0] x n + [re_a_in, im_a_in] + [edelay]
         ret = np.zeros_like(freq).astype(complex)
+    
+        resonators = self.resonators
+        a_in = self.a_in
+        edelay = self.edelay
 
-        for resonator in self.resonators:
+        if len(params) > 0:
+            resonators = deepcopy(self.resonators)
+            n_params = 3
+            if self.allow_mismatch:
+                n_params = 4
+            for i, resonator in enumerate(resonators):
+                resonator.params[:n_params] = params[n_params*i: n_params*(i+1)]
+            
+            end_of_params = params[n_params*len(self.resonators):]
+            
+            a_in = None
+            edelay = None
+            if len(end_of_params) >= 2:
+                a_in = end_of_params[0] + 1j*end_of_params[1]
+            if len(end_of_params) == 3:
+                edelay = end_of_params[2]
+
+        for resonator in resonators:
             ret += resonator(freq, re_a_in = 1, im_a_in = 0, edelay=0)
         ret -= len(self.resonators) - 1
 
-        ret *= self.a_in
-        ret *= np.exp(+2j*np.pi*self.edelay*self.freq)
+        if a_in is not None:
+            ret *= a_in
+        if edelay is not None:
+            ret *= np.exp(+2j*np.pi*edelay*freq)
+
+        return ret
+
+    @property
+    def allow_mismatch(self):
+        for resonator in self.resonators:
+            if resonator.phi_0 is not None:
+                return True
+        return False
+
+    @property
+    def params(self):
+        ret = []
+        
+        n_params = 3
+        if self.allow_mismatch:
+            n_params = 4
+        for resonator in self.resonators:
+            ret += resonator.params[:n_params]
+
+        if self.a_in is not None:
+            ret += [np.real(self.a_in), np.imag(self.a_in)]
+        if self.edelay is not None:
+            ret += [self.edelay]
 
         return ret
 
