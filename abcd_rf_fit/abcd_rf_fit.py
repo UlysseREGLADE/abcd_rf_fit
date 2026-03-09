@@ -212,7 +212,7 @@ def fit_signal(
     if resonator_params.phi_0 is not None and  np.abs(resonator_params.phi_0) > 0.25:
         warnings.warn("Extracted phi_0 greater than 0.25, this might indicate a big impedance mismatch, values of kappa_i and kappa_c might be affected, you can try to set: allow_mismatch=False", UserWarning)
 
-    return fit_func, ResonatorParams(params, geometry, freq, signal)
+    return fit_func, resonator_params
 
 def analyze(
     freq: np.ndarray,
